@@ -1,0 +1,2046 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<meta name="color-scheme" content="dark" />
+<link rel="icon" href="data:," />
+<title>أطلس أرغوس — خريطة العالم الحية بالعربية</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;600&display=swap" rel="stylesheet" />
+<link href="https://unpkg.com/maplibre-gl@5.7.0/dist/maplibre-gl.css" rel="stylesheet" />
+<style>
+  :root{
+    --ink:#0a0e13;
+    --ink-2:#10161f;
+    --ink-3:#171f2b;
+    --line:#26303f;
+    --line-soft:#1c2531;
+    --paper:#e9e4d8;
+    --paper-dim:#a9b2bf;
+    --paper-faint:#6e7a89;
+    --amber:#e2a63d;
+    --amber-soft:#f0c169;
+    --teal:#3ec6b8;
+    --red:#e5534b;
+    --sky:#5aa9e6;
+    --violet:#b48ce0;
+    --green:#7bc47f;
+    --radius:10px;
+    --font:"IBM Plex Sans Arabic", system-ui, sans-serif;
+    --mono:"IBM Plex Mono", ui-monospace, monospace;
+  }
+  *{ box-sizing:border-box; }
+  html,body{ height:100%; }
+  body{
+    margin:0; background:var(--ink); color:var(--paper);
+    font-family:var(--font); overflow:hidden;
+    -webkit-font-smoothing:antialiased;
+  }
+  button, input, select{ font-family:var(--font); }
+  button{ cursor:pointer; }
+  :focus-visible{ outline:2px solid var(--amber); outline-offset:2px; }
+
+  /* ===== Layout ===== */
+  #app{ display:flex; flex-direction:column; height:100dvh; }
+
+  /* ===== Top bar ===== */
+  header{
+    display:flex; align-items:center; gap:10px;
+    padding:8px 12px; background:var(--ink-2);
+    border-bottom:1px solid var(--line); z-index:30; position:relative;
+  }
+  .brand{ display:flex; align-items:center; gap:10px; min-width:0; }
+  .brand-mark{
+    width:38px; height:38px; flex:0 0 38px; border-radius:9px;
+    background:var(--ink-3); border:1px solid var(--line);
+    display:grid; place-items:center;
+  }
+  .brand-mark svg{ display:block; }
+  .brand h1{ margin:0; font-size:17px; font-weight:700; letter-spacing:.2px; white-space:nowrap; }
+  .brand h1 span{ color:var(--amber); }
+  .brand small{ display:block; font-size:11px; color:var(--paper-faint); font-weight:500; white-space:nowrap; }
+  .proto-badge{
+    font-size:11px; font-weight:600; color:var(--ink);
+    background:var(--amber); border-radius:999px; padding:3px 10px; white-space:nowrap;
+  }
+  .searchbox{
+    flex:1 1 auto; max-width:520px; margin-inline:auto; position:relative;
+  }
+  .searchbox input{
+    width:100%; height:40px; border-radius:9px; border:1px solid var(--line);
+    background:var(--ink); color:var(--paper); padding:0 38px 0 12px; font-size:14px;
+  }
+  .searchbox input::placeholder{ color:var(--paper-faint); }
+  .searchbox .s-ico{
+    position:absolute; inset-inline-start:11px; top:50%; transform:translateY(-50%);
+    color:var(--paper-faint); pointer-events:none; display:flex;
+  }
+  .search-results{
+    position:absolute; top:46px; inset-inline:0; background:var(--ink-3);
+    border:1px solid var(--line); border-radius:10px; overflow:hidden;
+    box-shadow:0 18px 40px rgba(0,0,0,.5); display:none; z-index:60;
+  }
+  .search-results.open{ display:block; }
+  .search-results button{
+    display:block; width:100%; text-align:start; background:none; border:0;
+    border-bottom:1px solid var(--line-soft); color:var(--paper);
+    padding:11px 14px; font-size:13.5px; min-height:44px;
+  }
+  .search-results button:last-child{ border-bottom:0; }
+  .search-results button:hover{ background:var(--ink-2); }
+  .search-results small{ display:block; color:var(--paper-faint); font-size:11.5px; margin-top:2px; }
+  .top-actions{ display:flex; gap:8px; align-items:center; }
+  .tbtn{
+    height:40px; padding:0 14px; border-radius:9px; border:1px solid var(--line);
+    background:var(--ink-3); color:var(--paper); font-size:13px; font-weight:600;
+    display:inline-flex; align-items:center; gap:7px; white-space:nowrap;
+  }
+  .tbtn:hover{ border-color:var(--amber); color:var(--amber-soft); }
+  .tbtn.pro{ background:var(--amber); border-color:var(--amber); color:var(--ink); }
+  .tbtn.pro:hover{ background:var(--amber-soft); color:var(--ink); }
+  .clock{
+    font-family:var(--mono); font-size:12.5px; color:var(--paper-dim);
+    border:1px solid var(--line-soft); border-radius:8px; padding:8px 10px;
+    background:var(--ink); white-space:nowrap; direction:ltr;
+  }
+  .clock b{ color:var(--amber-soft); font-weight:600; }
+
+  /* ===== Stats strip ===== */
+  #stats{
+    display:flex; gap:0; overflow-x:auto; scrollbar-width:none;
+    background:var(--ink); border-bottom:1px solid var(--line-soft); z-index:20;
+  }
+  #stats::-webkit-scrollbar{ display:none; }
+  .stat{
+    flex:0 0 auto; padding:7px 14px; border-inline-end:1px solid var(--line-soft);
+    display:flex; align-items:baseline; gap:7px; font-size:12px; color:var(--paper-dim);
+  }
+  .stat b{ font-family:var(--mono); font-size:15px; color:var(--paper); font-weight:600; direction:ltr; }
+  .stat .dot{ width:7px; height:7px; border-radius:50%; align-self:center; flex:0 0 7px; }
+  .stat.live b{ color:var(--teal); }
+  .stat .src{ font-size:10.5px; color:var(--paper-faint); }
+
+  /* ===== Main row ===== */
+  #main{ flex:1; display:flex; min-height:0; position:relative; }
+
+  /* ===== Layers panel ===== */
+  #panel{
+    width:288px; flex:0 0 288px; background:var(--ink-2);
+    border-inline-end:1px solid var(--line); overflow-y:auto; z-index:25;
+    padding:14px 12px 20px;
+  }
+  #panel h2{
+    margin:2px 4px 10px; font-size:12px; font-weight:700; color:var(--paper-faint);
+    letter-spacing:.4px;
+  }
+  .layer{
+    display:flex; align-items:center; gap:10px; width:100%;
+    background:var(--ink-3); border:1px solid var(--line-soft); border-radius:var(--radius);
+    padding:10px 12px; margin-bottom:8px; color:var(--paper); text-align:start;
+    min-height:52px; transition:border-color .15s;
+  }
+  .layer:hover{ border-color:var(--line); }
+  .layer .sw{ width:11px; height:11px; border-radius:3px; flex:0 0 11px; }
+  .layer .sw-ico{
+    width:26px; height:26px; flex:0 0 26px; display:grid; place-items:center;
+    background:var(--ink); border:1px solid var(--line-soft); border-radius:7px;
+  }
+  .layer .sw-ico svg{ display:block; }
+  .layer .lt{ flex:1; min-width:0; }
+  .layer .lt b{ display:block; font-size:14px; font-weight:600; }
+  .layer .lt small{ display:block; font-size:11px; color:var(--paper-faint); margin-top:1px; line-height:1.6; }
+  .layer .cnt{ font-family:var(--mono); font-size:12px; color:var(--paper-dim); direction:ltr; }
+  .layer .tg{
+    width:40px; height:22px; border-radius:999px; background:var(--ink); border:1px solid var(--line);
+    position:relative; flex:0 0 40px; transition:background .15s;
+  }
+  .layer .tg::after{
+    content:""; position:absolute; top:2px; inset-inline-start:2px; width:16px; height:16px;
+    border-radius:50%; background:var(--paper-faint); transition:transform .15s, background .15s;
+  }
+  .layer.on{ border-color:var(--line); }
+  .layer.on .tg{ background:var(--amber); border-color:var(--amber); }
+  .layer.on .tg::after{ transform:translateX(-18px); background:var(--ink); }
+  .demo-tag{
+    font-size:9.5px; font-weight:700; color:var(--ink); background:var(--paper-dim);
+    border-radius:4px; padding:1px 5px; vertical-align:2px; margin-inline-start:5px;
+  }
+  .live-tag{
+    font-size:9.5px; font-weight:700; color:var(--ink); background:var(--teal);
+    border-radius:4px; padding:1px 5px; vertical-align:2px; margin-inline-start:5px;
+  }
+  .panel-sec{ margin-top:18px; }
+  .style-row{ display:flex; gap:8px; }
+  .style-row button{
+    flex:1; height:40px; border-radius:9px; border:1px solid var(--line-soft);
+    background:var(--ink-3); color:var(--paper-dim); font-size:12.5px; font-weight:600;
+  }
+  .style-row button.active{ border-color:var(--amber); color:var(--amber-soft); }
+  .mini-btns{ display:flex; gap:8px; margin-top:8px; }
+  .mini-btns button{
+    flex:1; height:40px; border-radius:9px; border:1px solid var(--line-soft);
+    background:var(--ink-3); color:var(--paper-dim); font-size:12.5px; font-weight:600;
+    display:inline-flex; align-items:center; justify-content:center; gap:6px;
+  }
+  .mini-btns button.active{ border-color:var(--amber); color:var(--amber-soft); }
+  .src-list{ margin:0; padding:0 4px; list-style:none; font-size:12px; color:var(--paper-dim); line-height:2; }
+  .src-list b{ color:var(--paper); font-weight:600; }
+  .src-list span{ color:var(--paper-faint); font-size:11px; }
+  .note-box{
+    margin:14px 4px 0; font-size:11.5px; line-height:1.9; color:var(--paper-dim);
+    border:1px dashed var(--line); border-radius:var(--radius); padding:10px 12px;
+  }
+  .note-box b{ color:var(--amber-soft); }
+
+  /* ===== Map ===== */
+  #map-wrap{ flex:1; position:relative; min-width:0; background:#04070c; }
+  #map{ position:absolute; inset:0; }
+  .maplibregl-ctrl-attrib{ font-size:10px !important; }
+  .maplibregl-popup-content{
+    background:var(--ink-3); color:var(--paper); border:1px solid var(--line);
+    border-radius:10px; font-family:var(--font); font-size:12.5px; padding:10px 12px;
+    direction:rtl; text-align:right;
+  }
+  .maplibregl-popup-anchor-bottom .maplibregl-popup-tip{ border-top-color:var(--ink-3); }
+  .maplibregl-popup-anchor-top .maplibregl-popup-tip{ border-bottom-color:var(--ink-3); }
+  .maplibregl-popup-close-button{ color:var(--paper-dim); font-size:16px; padding:2px 7px; }
+
+  .iss-marker{
+    width:34px; height:34px; border-radius:50%;
+    background:rgba(62,198,184,.16); border:1.5px solid var(--teal);
+    display:grid; place-items:center; color:var(--teal);
+    box-shadow:0 0 0 6px rgba(62,198,184,.08);
+  }
+
+  #status-pill{
+    position:absolute; bottom:14px; inset-inline-start:14px; z-index:15;
+    background:rgba(16,22,31,.92); border:1px solid var(--line); border-radius:999px;
+    padding:7px 13px; font-size:12px; color:var(--paper-dim);
+    display:flex; align-items:center; gap:8px; backdrop-filter:blur(4px);
+    max-width:min(92vw, 480px);
+  }
+  #status-pill .pulse{ width:8px; height:8px; border-radius:50%; background:var(--teal); flex:0 0 8px; animation:pl 1.6s infinite; }
+  @keyframes pl{ 0%,100%{ opacity:1; } 50%{ opacity:.35; } }
+  @media (prefers-reduced-motion: reduce){ #status-pill .pulse{ animation:none; } }
+
+  #panel-toggle{
+    display:none; position:absolute; top:12px; inset-inline-start:12px; z-index:26;
+    height:42px; padding:0 15px; border-radius:10px; border:1px solid var(--line);
+    background:rgba(16,22,31,.94); color:var(--paper); font-size:13.5px; font-weight:700;
+    align-items:center; gap:8px; box-shadow:0 8px 24px rgba(0,0,0,.45);
+  }
+
+  /* ===== Detail card ===== */
+  #detail{
+    position:absolute; top:12px; inset-inline-end:12px; z-index:24; width:320px; max-width:calc(100vw - 24px);
+    background:rgba(16,22,31,.97); border:1px solid var(--line); border-radius:14px;
+    box-shadow:0 20px 50px rgba(0,0,0,.55); overflow:hidden; display:none;
+  }
+  #detail.open{ display:block; }
+  #detail .d-head{
+    padding:13px 15px 10px; border-bottom:1px solid var(--line-soft);
+    display:flex; align-items:flex-start; gap:10px;
+  }
+  #detail .d-kind{
+    font-size:10.5px; font-weight:700; border-radius:5px; padding:2px 8px; color:var(--ink);
+    background:var(--amber); white-space:nowrap; margin-top:2px;
+  }
+  #detail h3{ margin:0; font-size:16px; font-weight:700; line-height:1.5; flex:1; }
+  #detail .d-close{
+    width:36px; height:36px; border-radius:8px; border:1px solid var(--line-soft);
+    background:var(--ink-3); color:var(--paper-dim); font-size:16px; flex:0 0 36px;
+  }
+  #detail .d-body{ padding:11px 15px 14px; max-height:46dvh; overflow-y:auto; }
+  .d-row{
+    display:flex; justify-content:space-between; gap:12px; padding:6px 0;
+    border-bottom:1px solid var(--line-soft); font-size:13px;
+  }
+  .d-row:last-child{ border-bottom:0; }
+  .d-row span{ color:var(--paper-faint); flex:0 0 auto; }
+  .d-row b{ font-weight:600; text-align:end; font-family:var(--mono); font-size:12.5px; direction:ltr; }
+  .d-row b.ar{ font-family:var(--font); direction:rtl; font-size:13px; }
+  #detail .d-link{
+    display:flex; align-items:center; justify-content:center; gap:7px;
+    margin:0 15px 14px; height:40px; border-radius:9px; background:var(--ink-3);
+    border:1px solid var(--line); color:var(--amber-soft); text-decoration:none;
+    font-size:13px; font-weight:600;
+  }
+
+  /* ===== Live camera viewer (inside detail card) ===== */
+  #d-media{ border-bottom:1px solid var(--line-soft); background:#000; }
+  .dm-frame{ position:relative; aspect-ratio:4/3; background:#05080c; overflow:hidden; }
+  .dm-frame img, .dm-frame video{
+    position:absolute; inset:0; width:100%; height:100%; object-fit:contain; background:#05080c; display:block;
+  }
+  .dm-live{
+    position:absolute; top:9px; inset-inline-start:9px; z-index:3;
+    display:inline-flex; align-items:center; gap:6px;
+    background:rgba(5,8,12,.82); border:1px solid rgba(229,83,75,.65); color:#ffb3ad;
+    font-size:11px; font-weight:700; border-radius:999px; padding:4px 10px;
+  }
+  .dm-live i{ width:7px; height:7px; border-radius:50%; background:var(--red); animation:pl 1.2s infinite; }
+  .dm-time{
+    position:absolute; bottom:9px; inset-inline-end:9px; z-index:3;
+    background:rgba(5,8,12,.82); border:1px solid var(--line); color:var(--paper-dim);
+    font-family:var(--mono); font-size:10.5px; border-radius:6px; padding:3px 8px; direction:ltr;
+  }
+  .dm-cap{
+    padding:8px 13px; font-size:11.5px; color:var(--paper-dim); line-height:1.8;
+    display:flex; align-items:center; justify-content:space-between; gap:10px;
+  }
+  .dm-cap b{ color:var(--teal); font-weight:700; }
+  #detail .d-act{
+    display:none; align-items:center; justify-content:center; gap:7px; width:calc(100% - 30px);
+    margin:0 15px 10px; height:40px; border-radius:9px; background:var(--amber);
+    border:1px solid var(--amber); color:var(--ink); font-size:13px; font-weight:700;
+  }
+  #detail .d-act.show{ display:flex; }
+  #detail .d-act.tracking{ background:var(--ink-3); border-color:var(--teal); color:var(--teal); }
+
+  /* ===== Modal ===== */
+  .modal-back{
+    position:fixed; inset:0; background:rgba(4,6,9,.72); z-index:80;
+    display:none; align-items:flex-end; justify-content:center; padding:0;
+  }
+  .modal-back.open{ display:flex; }
+  .modal{
+    background:var(--ink-2); border:1px solid var(--line); border-radius:18px 18px 0 0;
+    width:100%; max-width:860px; max-height:88dvh; overflow-y:auto; padding:22px 20px 28px;
+  }
+  .modal h2{ margin:0 0 4px; font-size:21px; font-weight:700; }
+  .modal .sub{ color:var(--paper-dim); font-size:13.5px; line-height:1.9; margin:0 0 18px; }
+  .modal .m-close{
+    float:left; width:38px; height:38px; border-radius:9px; border:1px solid var(--line);
+    background:var(--ink-3); color:var(--paper); font-size:16px;
+  }
+  .plans{ display:grid; grid-template-columns:repeat(auto-fit, minmax(180px,1fr)); gap:10px; }
+  .plan{
+    border:1px solid var(--line-soft); border-radius:12px; padding:15px 14px; background:var(--ink-3);
+  }
+  .plan.hot{ border-color:var(--amber); }
+  .plan h4{ margin:0 0 2px; font-size:14px; font-weight:700; letter-spacing:.4px; }
+  .plan .price{ font-family:var(--mono); font-size:24px; font-weight:600; color:var(--amber-soft); direction:ltr; text-align:end; }
+  .plan .price small{ font-size:11px; color:var(--paper-faint); font-family:var(--font); }
+  .plan ul{ margin:10px 0 0; padding:0 16px 0 0; font-size:12px; color:var(--paper-dim); line-height:2; }
+  .road{ display:grid; grid-template-columns:repeat(auto-fit, minmax(220px,1fr)); gap:10px; margin-top:6px; }
+  .road .step{ border:1px solid var(--line-soft); border-radius:12px; padding:14px; background:var(--ink-3); }
+  .road .step b{ display:block; font-size:14px; margin-bottom:5px; color:var(--amber-soft); }
+  .road .step p{ margin:0; font-size:12.5px; color:var(--paper-dim); line-height:1.95; }
+  .fineprint{ font-size:11px; color:var(--paper-faint); line-height:1.9; margin-top:16px; }
+
+  #toast{
+    position:fixed; bottom:20px; left:50%; transform:translateX(-50%) translateY(80px);
+    background:var(--ink-3); border:1px solid var(--amber); color:var(--paper);
+    border-radius:10px; padding:11px 18px; font-size:13.5px; z-index:99;
+    transition:transform .25s; max-width:92vw; text-align:center;
+  }
+  #toast.show{ transform:translateX(-50%) translateY(0); }
+
+  /* ===== Flight filter chips ===== */
+  .chip-row{ display:flex; gap:6px; flex-wrap:wrap; margin:2px 0 4px; }
+  .chip{
+    height:34px; padding:0 13px; border-radius:999px; border:1px solid var(--line-soft);
+    background:var(--ink-3); color:var(--paper-dim); font-size:12.5px; font-weight:600;
+  }
+  .chip.active{ border-color:var(--sky); color:var(--sky); background:rgba(90,169,230,.1); }
+  .chip.emg.active{ border-color:var(--red); color:var(--red); background:rgba(229,83,75,.1); }
+
+  /* ===== AIS key box ===== */
+  .key-box{ display:flex; gap:7px; }
+  .key-box input{
+    flex:1; min-width:0; height:40px; border-radius:9px; border:1px solid var(--line);
+    background:var(--ink); color:var(--paper); padding:0 11px; font-size:13px;
+    font-family:var(--mono); direction:ltr; text-align:left;
+  }
+  .key-box input::placeholder{ font-family:var(--font); color:var(--paper-faint); direction:rtl; text-align:right; }
+  .key-box button{
+    height:40px; padding:0 15px; border-radius:9px; border:1px solid var(--amber);
+    background:var(--amber); color:var(--ink); font-size:13px; font-weight:700; flex:0 0 auto;
+  }
+  .key-note{ font-size:11.5px; color:var(--paper-faint); line-height:1.9; margin:8px 2px 0; }
+  .key-note b{ color:var(--paper-dim); }
+  .key-note .ok{ color:var(--teal); font-weight:700; }
+  .key-note .bad{ color:var(--red); font-weight:700; }
+
+  /* ===== Live ticker ===== */
+  #ticker{
+    display:flex; align-items:center; gap:10px; padding:6px 14px;
+    background:#131a26; border-bottom:1px solid var(--line-soft); z-index:19;
+    font-size:12.5px; color:var(--paper-dim); min-height:34px;
+  }
+  .tk-live{
+    display:inline-flex; align-items:center; gap:6px; flex:0 0 auto;
+    color:#ffb3ad; font-weight:700; font-size:11.5px;
+    border:1px solid rgba(229,83,75,.55); border-radius:999px; padding:2px 9px;
+  }
+  .tk-live i{ width:7px; height:7px; border-radius:50%; background:var(--red); animation:pl 1.2s infinite; }
+  #ticker-text{ flex:1; min-width:0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; transition:opacity .25s; }
+  #ticker-time{ font-family:var(--mono); font-size:11px; color:var(--paper-faint); flex:0 0 auto; direction:ltr; }
+
+  /* ===== Live world feed (panel) ===== */
+  .feed-item{
+    display:flex; gap:9px; width:100%; text-align:start; align-items:flex-start;
+    background:var(--ink-3); border:1px solid var(--line-soft); border-radius:9px;
+    padding:8px 10px; margin-bottom:6px; color:var(--paper); min-height:44px;
+  }
+  .feed-item:hover{ border-color:var(--line); }
+  .feed-item .f-ico{ flex:0 0 26px; width:26px; height:26px; display:grid; place-items:center; background:var(--ink); border:1px solid var(--line-soft); border-radius:7px; }
+  .feed-item .f-tx{ flex:1; min-width:0; }
+  .feed-item .f-tx b{ display:block; font-size:12.5px; font-weight:600; line-height:1.6; }
+  .feed-item .f-tx small{ display:block; color:var(--paper-faint); font-size:11px; margin-top:1px; }
+  .new-tag{
+    font-size:9px; font-weight:700; color:#fff; background:var(--red);
+    border-radius:4px; padding:1px 5px; vertical-align:2px; margin-inline-start:6px;
+  }
+  .feed-empty{ font-size:12px; color:var(--paper-faint); line-height:1.9; margin:2px 2px 6px; }
+  .vw-btn{
+    display:flex; align-items:center; justify-content:center; gap:8px; width:100%;
+    height:46px; border-radius:var(--radius); border:1px solid var(--amber);
+    background:var(--amber); color:var(--ink); font-size:13.5px; font-weight:700; margin-bottom:4px;
+  }
+  .vw-btn:hover{ background:var(--amber-soft); }
+
+  /* ===== Videowall ===== */
+  .vw-grid{ display:grid; grid-template-columns:repeat(auto-fill, minmax(230px,1fr)); gap:10px; }
+  .vw-tile{ background:#000; border:1px solid var(--line-soft); border-radius:10px; overflow:hidden; }
+  .vw-frame{ aspect-ratio:16/9; background:#05080c; }
+  .vw-frame iframe{ width:100%; height:100%; border:0; display:block; }
+  .vw-cap{ padding:7px 10px 9px; background:var(--ink-3); }
+  .vw-cap b{ display:block; font-size:12.5px; font-weight:600; line-height:1.6; }
+  .vw-cap span{ display:block; font-size:11px; color:var(--paper-faint); margin-top:1px; }
+
+  /* YouTube live embed inside the detail card */
+  .dm-frame iframe{ position:absolute; inset:0; width:100%; height:100%; border:0; background:#05080c; display:block; }
+  .dm-frame.wide{ aspect-ratio:16/9; }
+
+  /* ===== Responsive ===== */
+  @media (max-width: 900px){
+    .brand small{ display:none; }
+    .clock{ display:none; }
+    #panel{
+      position:absolute; top:0; bottom:0; inset-inline-start:0; width:min(84vw, 300px);
+      transform:translateX(110%); transition:transform .25s; box-shadow:0 0 60px rgba(0,0,0,.6);
+      padding-top:64px;
+    }
+    #panel.open{ transform:translateX(0) !important; }
+    #panel-toggle{ display:inline-flex; }
+    #detail{ top:auto; bottom:12px; inset-inline:12px; width:auto; }
+    .tbtn .hide-s{ display:none; }
+  }
+  @media (max-width: 640px){
+    #btn-about{ display:none; }
+    header{ flex-wrap:wrap; row-gap:8px; }
+    .searchbox{ order:3; flex:1 1 100%; max-width:none; margin-inline:0; }
+    .top-actions{ margin-inline-start:auto; }
+  }
+  @media (max-width: 520px){
+    .brand h1{ font-size:15px; }
+    .proto-badge{ display:none; }
+    .tbtn{ padding:0 10px; }
+  }
+</style>
+</head>
+<body>
+<div id="app">
+
+  <header>
+    <div class="brand">
+      <div class="brand-mark" aria-hidden="true">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#e2a63d" stroke-width="1.7" stroke-linecap="round">
+          <circle cx="12" cy="12" r="9"/><ellipse cx="12" cy="12" rx="9" ry="3.6"/>
+          <path d="M12 3v18M5.5 6.5c4 2.4 9 2.4 13 0M5.5 17.5c4-2.4 9-2.4 13 0"/>
+        </svg>
+      </div>
+      <h1>أطلس <span>أرغوس</span><small>خريطة العالم الحية — بالعربية</small></h1>
+    </div>
+    <span class="proto-badge">بيانات حية</span>
+
+    <div class="searchbox">
+      <span class="s-ico" aria-hidden="true">
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>
+      </span>
+      <input id="search" type="search" placeholder="ابحث عن مدينة أو مطار…" autocomplete="off" aria-label="بحث على الخريطة" />
+      <div class="search-results" id="search-results" role="listbox"></div>
+    </div>
+
+    <div class="top-actions">
+      <div class="clock" title="بتوقيت بغداد"><b id="clock">--:--:--</b> بغداد</div>
+      <button class="tbtn" id="btn-about" type="button">كيف يعمل؟</button>
+      <button class="tbtn pro" id="btn-plans" type="button">خطط <span class="hide-s">PRO</span></button>
+    </div>
+  </header>
+
+  <div id="stats" aria-label="أرقام حية">
+    <div class="stat live"><span class="dot" style="background:var(--sky)"></span>طائرات في المشهد <b id="st-flights">…</b><span class="src">adsb.lol</span></div>
+    <div class="stat live"><span class="dot" style="background:var(--red)"></span>زلازل اليوم <b id="st-quakes">…</b><span class="src">USGS</span></div>
+    <div class="stat live"><span class="dot" style="background:var(--amber)"></span>أحداث طبيعية مفتوحة <b id="st-events">…</b><span class="src">NASA EONET</span></div>
+    <div class="stat live"><span class="dot" style="background:var(--teal)"></span>ارتفاع محطة الفضاء <b id="st-iss">…</b><span class="src">ISS</span></div>
+    <div class="stat live"><span class="dot" style="background:var(--red)"></span>كاميرات بث حي عالمي <b>30</b><span class="src">YouTube Live — موثقة 22/11/2026</span></div>
+    <div class="stat"><span class="dot" style="background:var(--paper-faint)"></span>كاميرات المنصة الأصلية <b>228,161</b><span class="src">لقطة فحص 22/11/2026</span></div>
+    <div class="stat"><span class="dot" style="background:var(--paper-faint)"></span>سفن تتابعها المنصة <b>19,683</b><span class="src">لقطة فحص 22/11/2026</span></div>
+    <div class="stat"><span class="dot" style="background:var(--paper-faint)"></span>محطات طاقة <b>34,936</b><span class="src">لقطة فحص 22/11/2026</span></div>
+    <div class="stat"><span class="dot" style="background:var(--paper-faint)"></span>مطارات <b>47,927</b><span class="src">لقطة فحص 22/11/2026</span></div>
+  </div>
+
+  <div id="ticker" aria-label="آخر الأحداث الحية في العالم">
+    <span class="tk-live"><i></i>مباشر الآن</span>
+    <span id="ticker-text">جارٍ جلب آخر أحداث العالم الحية…</span>
+    <span id="ticker-time"></span>
+  </div>
+
+  <div id="main">
+    <aside id="panel" aria-label="طبقات الخريطة">
+      <h2>طبقات الخريطة</h2>
+      <div id="layers"></div>
+
+      <div class="panel-sec">
+        <button type="button" class="vw-btn" id="btn-videowall">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4.6 7.3h7.9a2 2 0 0 1 2 2v5.4a2 2 0 0 1-2 2H4.6a2 2 0 0 1-2-2V9.3a2 2 0 0 1 2-2z"/><path d="M15.7 10.6l5.7-2.9v8.6l-5.7-2.9z"/></svg>
+          جدار البث المباشر — ٣٠ كاميرا عالمية حية
+        </button>
+      </div>
+
+      <div class="panel-sec">
+        <h2>يحدث الآن في العالم <span class="live-tag">مباشر</span></h2>
+        <div id="feed"><p class="feed-empty">جارٍ جلب آخر الزلازل والأحداث الطبيعية الحية من USGS و NASA…</p></div>
+        <p class="key-note">أحدث أحداث العالم أولاً بأول — تتحدث القائمة تلقائياً كل دقائق. دوس أي حدث للطيران إليه على الخريطة وفتح بطاقته.</p>
+      </div>
+
+      <div class="panel-sec">
+        <h2>مرشح الطائرات</h2>
+        <div class="chip-row" role="group" aria-label="مرشح الطائرات">
+          <button type="button" class="chip active" data-ff="all">الكل</button>
+          <button type="button" class="chip" data-ff="civ">مدني</button>
+          <button type="button" class="chip" data-ff="mil">عسكري</button>
+          <button type="button" class="chip emg" data-ff="emg">طوارئ فقط</button>
+        </div>
+      </div>
+
+      <div class="panel-sec">
+        <h2>ربط السفن الحية — AISHub</h2>
+        <div class="key-box">
+          <input id="ais-key" type="text" placeholder="مفتاح AISHub المجاني" autocomplete="off" spellcheck="false" aria-label="مفتاح AISHub" />
+          <button type="button" id="ais-apply">ربط</button>
+        </div>
+        <p class="key-note" id="ais-note">السفن الحية تحتاج مفتاح AIS مجاني: سجّل في موقع <b>AISHub</b> وخذ اسم المستخدم ثم الصقه هنا. المفتاح يبقى في جلسة المتصفح هذه فقط ولا يُحفظ ولا يُرسل لأي جهة غير AISHub نفسه. بدونه تظهر المضائق فقط — لا نعرض سفناً وهمية أبداً.</p>
+      </div>
+
+      <div class="panel-sec">
+        <h2>نمط الخريطة</h2>
+        <div class="style-row" role="group" aria-label="نمط الخريطة">
+          <button type="button" data-style="dark" class="active">داكن</button>
+          <button type="button" data-style="light">فاتح</button>
+          <button type="button" data-style="sat">قمر صناعي</button>
+        </div>
+        <div class="mini-btns">
+          <button type="button" id="btn-globe" class="active">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><ellipse cx="12" cy="12" rx="9" ry="3.6"/><path d="M12 3v18"/></svg>
+            الكرة الأرضية
+          </button>
+          <button type="button" id="btn-world">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M9 4L3 6v14l6-2 6 2 6-2V4l-6 2-6-2z"/><path d="M9 4v14M15 6v14"/></svg>
+            العالم كاملاً
+          </button>
+        </div>
+        <div class="mini-btns">
+          <button type="button" id="btn-cams-la">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4.6 7.3h7.9a2 2 0 0 1 2 2v5.4a2 2 0 0 1-2 2H4.6a2 2 0 0 1-2-2V9.3a2 2 0 0 1 2-2z"/><path d="M15.7 10.6l5.7-2.9v8.6l-5.7-2.9z"/></svg>
+            كاميرات لوس أنجلوس الحية
+          </button>
+        </div>
+        <div class="mini-btns">
+          <button type="button" id="btn-houses">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M3 11l9-8 9 8"/><path d="M5 10v10h14V10"/><path d="M10 20v-6h4v6"/></svg>
+            زوم البيوت
+          </button>
+          <button type="button" id="btn-3d">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 2l9 5-9 5-9-5 9-5z"/><path d="M3 12l9 5 9-5"/></svg>
+            إمالة ثلاثية
+          </button>
+          <button type="button" id="btn-locate">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/></svg>
+            موقعي
+          </button>
+          <button type="button" id="btn-refresh">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M21 12a9 9 0 1 1-2.6-6.4M21 3v6h-6"/></svg>
+            تحديث
+          </button>
+        </div>
+      </div>
+
+      <div class="panel-sec">
+        <h2>مصادر البيانات المفتوحة</h2>
+        <ul class="src-list">
+          <li><b>الطائرات</b> — adsb.lol <span>ADS-B حي — مدني وعسكري وطوارئ، وانقر أي طائرة لتتبعها حياً</span></li>
+          <li><b>كاميرات العالم الحية</b> — YouTube Live <span>٣٠ كاميرا موثقة بثاً حياً في 22 تشرين الثاني 2026 — مكة والمدينة ونيويورك ولندن وطوكيو وباريس وغيرها، فيديو مباشر عند النقر</span></li>
+          <li><b>كاميرات المرور</b> — Caltrans و WSDOT <span>بث حي من بوابات نقل رسمية — فيديو أو صورة تتجدد كل ثوانٍ</span></li>
+          <li><b>السفن</b> — AISHub <span>AIS حي بمفتاحك المجاني</span></li>
+          <li><b>المباني والبيوت</b> — OpenStreetMap عبر Overpass <span>حدود حقيقية عند التقريب</span></li>
+          <li><b>الزلازل</b> — USGS <span>هيئة المسح الجيولوجي الأمريكية</span></li>
+          <li><b>الأحداث الطبيعية</b> — NASA EONET <span>حرائق وعواصف وبراكين</span></li>
+          <li><b>محطة الفضاء</b> — <span dir="ltr" style="unicode-bidi:isolate">Where The ISS At</span> <span>تحديث كل ٥ ثوانٍ</span></li>
+          <li><b>طقس أي نقطة</b> — Open-Meteo <span>يظهر في بطاقة «ما هذا المكان؟»</span></li>
+          <li><b>بيانات الدول</b> — البنك الدولي <span>السكان والعاصمة في بطاقة المكان</span></li>
+          <li><b>الخريطة الأساسية</b> — CARTO و OpenStreetMap</li>
+          <li><b>صور القمر الصناعي</b> — Esri World Imagery <span>تقريب حتى زوم ١٩ — مستوى البيوت</span></li>
+          <li><b>البحث والعناوين</b> — Nominatim <span>عناوين وأرقام بيوت عند النقر</span></li>
+        </ul>
+        <div class="note-box">
+          <b>فكرة المنصة:</b> الموقع الأصلي لا يملك كاميرا ولا طائرة ولا قمراً صناعياً واحداً — يجمع بيانات مفتوحة مجانية من مصادر رسمية ويعرضها على خريطة واحدة. هنا كل طبقة موسومة بـ<b>حي</b> تجلب بيانات حقيقية لحظة فتحها من مصدرها الرسمي: طائرات ADS-B بمرشحات مدني وعسكري وطوارئ، وسفن AIS بمفتاحك المجاني، ومبانٍ وبيوت حقيقية من OpenStreetMap تظهر عند التقريب حتى زوم ١٩، وزلازل وأحداث ومحطة فضاء. والموسومة بـ<b>عرض</b> تعرض مواقع حقيقية بانتظار ربط واجهاتها. انقر أي كاميرا لتشاهد بثها الحي بعينك — ٣٠ كاميرا عالمية بفيديو مباشر متواصل من مكة والمدينة إلى نيويورك وطوكيو — وانقر أي طائرة لتتبعها وهي تتحرك، وانقر أي مكان لترى عنوانه وطقسه وبيانات دولته. وشريط «يحدث الآن في العالم» يجلب أحدث الزلازل والأحداث الطبيعية لحظة بلحظة فلا يفوتك أي حدث جديد. ملاحظة صادقة: لا توجد كاميرا ويب عامة حية موثقة في بغداد أو العراق حالياً، وكاميرات دبي كانت مطفأة لحظة التحقق — لذلك لا نعرض إلا كاميرات حية حقيقية تم التحقق منها وحدة وحدة.
+        </div>
+      </div>
+    </aside>
+
+    <div id="map-wrap">
+      <div id="map" aria-label="الخريطة التفاعلية"></div>
+      <button id="panel-toggle" type="button" aria-controls="panel" aria-expanded="false">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 6h16M4 12h16M4 18h16"/></svg>
+        الطبقات
+      </button>
+
+      <section id="detail" aria-live="polite">
+        <div class="d-head">
+          <span class="d-kind" id="d-kind">—</span>
+          <h3 id="d-title">—</h3>
+          <button class="d-close" id="d-close" type="button" aria-label="إغلاق البطاقة">✕</button>
+        </div>
+        <div id="d-media" hidden>
+          <div class="dm-frame">
+            <img id="d-cam-img" alt="بث كاميرا مباشر" />
+            <video id="d-cam-video" muted autoplay playsinline style="display:none"></video>
+            <iframe id="d-cam-frame" style="display:none" allow="autoplay; encrypted-media; picture-in-picture" allowfullscreen title="بث كاميرا مباشر"></iframe>
+            <span class="dm-live"><i></i>مباشر الآن</span>
+            <span class="dm-time" id="d-cam-time"></span>
+          </div>
+          <div class="dm-cap"><span id="d-cam-cap">صورة حية تتجدد تلقائياً من بوابة الكاميرا الرسمية</span><b id="d-cam-state">جارٍ الاتصال…</b></div>
+        </div>
+        <div class="d-body" id="d-body"></div>
+        <button class="d-act" id="d-act" type="button"></button>
+        <a class="d-link" id="d-link" href="#" target="_blank" rel="noopener" style="display:none">فتح المصدر الرسمي</a>
+      </section>
+
+      <div id="status-pill"><span class="pulse"></span><span id="status-text">جارٍ الاتصال بمصادر البيانات الحية…</span></div>
+    </div>
+  </div>
+</div>
+
+<!-- ===== Plans / about modal ===== -->
+<div class="modal-back" id="modal-back">
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="modal-title">
+    <button class="m-close" id="modal-close" type="button" aria-label="إغلاق">✕</button>
+    <div id="modal-content"></div>
+  </div>
+</div>
+
+<div id="toast" role="status"></div>
+
+<script src="https://unpkg.com/maplibre-gl@5.7.0/dist/maplibre-gl.js"></script>
+<script>
+(function(){
+"use strict";
+
+/* ---------- Helpers ---------- */
+var $ = function(id){ return document.getElementById(id); };
+function fmt(n){ return (n==null||isNaN(n)) ? "—" : Number(n).toLocaleString("en-US"); }
+function esc(s){ return String(s==null?"":s).replace(/[&<>"]/g, function(c){ return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]; }); }
+var toastTimer = null;
+function toast(msg){
+  var t = $("toast"); t.textContent = msg; t.classList.add("show");
+  clearTimeout(toastTimer); toastTimer = setTimeout(function(){ t.classList.remove("show"); }, 3400);
+}
+function setStatus(msg){ $("status-text").textContent = msg; }
+
+/* ---------- Clock (Baghdad) ---------- */
+function tickClock(){
+  try{
+    $("clock").textContent = new Date().toLocaleTimeString("en-GB", { timeZone:"Asia/Baghdad", hour12:false });
+  }catch(e){ $("clock").textContent = new Date().toLocaleTimeString("en-GB", { hour12:false }); }
+}
+tickClock(); setInterval(tickClock, 1000);
+
+/* ---------- Map ---------- */
+var STYLES = {
+  dark:  "https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json",
+  light: "https://basemaps.cartocdn.com/gl/positron-gl-style/style.json"
+};
+var map = null;
+var globeOn = true;   /* Reference site opens on a full 3D globe */
+/* Arabic label shaping: without this plugin MapLibre draws Arabic
+   letters disconnected and reversed when zooming in. */
+try {
+  if (window.maplibregl && maplibregl.setRTLTextPlugin) {
+    maplibregl.setRTLTextPlugin(
+      "https://unpkg.com/@mapbox/mapbox-gl-rtl-text@0.2.3/mapbox-gl-rtl-text.min.js",
+      null, true
+    );
+  }
+} catch (e) { /* labels still render, shaping plugin is progressive */ }
+try {
+  map = new maplibregl.Map({
+    container: "map",
+    style: STYLES.dark,
+    center: [38, 25],           /* whole globe in view, Middle East centred */
+    zoom: 1.55,
+    minZoom: 0.4,
+    attributionControl: { compact: true },
+    maxZoom: 19
+  });
+  map.addControl(new maplibregl.NavigationControl({ visualizePitch: true }), "bottom-left");
+  map.addControl(new maplibregl.ScaleControl({ maxWidth: 90, unit: "metric" }), "bottom-right");
+} catch (err) {
+  map = null;
+  setStatus("تعذر تحميل مكتبة الخريطة — تحقق من الاتصال ثم أعد تحميل الصفحة");
+}
+
+function applyGlobe(){
+  if (!map) return;
+  try {
+    if (map.setProjection) map.setProjection({ type: globeOn ? "globe" : "mercator" });
+  } catch (e) {}
+  if (globeOn) {
+    try {
+      if (map.setSky) map.setSky({
+        "sky-color": "#0b1624",
+        "horizon-color": "#33566e",
+        "fog-color": "#0a0e13",
+        "sky-horizon-blend": 0.6,
+        "horizon-fog-blend": 0.6,
+        "fog-ground-blend": 0.4
+      });
+    } catch (e) {}
+  }
+}
+
+var SAT_ID = "esri-sat";
+function addSatellite(){
+  if (!map.getSource(SAT_ID)){
+    map.addSource(SAT_ID, {
+      type: "raster",
+      tiles: ["https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"],
+      tileSize: 256,
+      attribution: "Esri World Imagery"
+    });
+  }
+  if (!map.getLayer(SAT_ID)){
+    var firstSymbol = null;
+    var layers = map.getStyle().layers;
+    for (var i=0;i<layers.length;i++){ if (layers[i].type === "symbol"){ firstSymbol = layers[i].id; break; } }
+    map.addLayer({ id: SAT_ID, type: "raster", source: SAT_ID, layout:{ visibility:"none" } }, firstSymbol || undefined);
+  }
+}
+
+/* ---------- Demo / reference datasets (real places) ---------- */
+/* Cameras are NOT a baked list: fetched live at runtime from the official Caltrans (California DOT) and WSDOT (Washington DOT) ArcGIS camera services — real coordinates, real snapshot URLs, real streams. See loadCameras(). */
+var STRAITS = [
+  { name:"مضيق هرمز", note:"ممر النفط الأهم عالمياً بين الخليج العربي وخليج عُمان", coords:[56.45,26.56] },
+  { name:"قناة السويس", note:"شريان التجارة بين البحر الأحمر والمتوسط", coords:[32.55,30.43] },
+  { name:"مضيق جبل طارق", note:"بوابة المتوسط الغربية نحو الأطلسي", coords:[-5.60,35.98] },
+  { name:"مضيق ملقا", note:"أزحم ممرات الشحن بين المحيطين الهندي والهادئ", coords:[100.60,3.90] },
+  { name:"قناة بنما", note:"وصلة الأطلسي بالهادئ عبر أمريكا الوسطى", coords:[-79.68,9.16] },
+  { name:"باب المندب", note:"مدخل البحر الأحمر الجنوبي نحو قناة السويس", coords:[43.42,12.58] }
+];
+var INFRA = [
+  { name:"مطار بغداد الدولي", kind:"مطار", coords:[44.23,33.26] },
+  { name:"مطار البصرة الدولي", kind:"مطار", coords:[47.66,30.55] },
+  { name:"مطار دبي الدولي", kind:"مطار", coords:[55.36,25.25] },
+  { name:"مطار حمد الدولي — الدوحة", kind:"مطار", coords:[51.61,25.27] },
+  { name:"مطار الملك عبد العزيز — جدة", kind:"مطار", coords:[39.17,21.68] },
+  { name:"مطار إسطنبول", kind:"مطار", coords:[28.75,41.26] },
+  { name:"مطار القاهرة الدولي", kind:"مطار", coords:[31.41,30.12] },
+  { name:"ميناء أم قصر — العراق", kind:"ميناء", coords:[47.93,30.04] },
+  { name:"ميناء جبل علي — دبي", kind:"ميناء", coords:[55.03,25.01] },
+  { name:"ميناء جدة الإسلامي", kind:"ميناء", coords:[39.16,21.49] },
+  { name:"ميناء بورسعيد — مصر", kind:"ميناء", coords:[32.30,31.26] },
+  { name:"محطة كهرباء بسماية — بغداد", kind:"محطة طاقة", coords:[44.62,33.10] },
+  { name:"سد الموصل — نينوى", kind:"سد", coords:[43.03,36.63] },
+  { name:"السد العالي — أسوان", kind:"سد", coords:[32.88,23.97] }
+];
+var THEATERS = [
+  { name:"مسرح أوكرانيا", note:"جبهة نشطة — خطوط تماس وأحداث موثقة", coords:[31.5,49.0] },
+  { name:"مسرح غزة وجنوب لبنان", note:"جبهة نشطة — أحداث موثقة يومياً", coords:[34.3,31.4] },
+  { name:"مسرح البحر الأحمر", note:"تهديدات للملاحة ومسارات مقدرة للسفن", coords:[42.5,15.5] },
+  { name:"مسرح السودان", note:"نزاع داخلي — أحداث موثقة", coords:[30.2,15.6] },
+  { name:"مسرح الساحل الأفريقي", note:"نشاط جماعات مسلحة — مراقبة مستمرة", coords:[2.0,15.0] },
+  { name:"مسرح بحر الصين الجنوبي", note:"توتر بحري وجوي — مراقبة مستمرة", coords:[114.5,13.5] },
+  { name:"مسرح كشمير", note:"خط تماس هندي باكستاني", coords:[74.8,34.5] },
+  { name:"مسرح ميانمار", note:"نزاع داخلي — أحداث موثقة", coords:[96.0,20.0] }
+];
+var PEOPLE = [
+  { name:"إيلون ماسك", note:"ثروة مرجعية من Forbes — طائرته ويخته يضيئان عند الحركة", coords:[-97.74,30.27] },
+  { name:"جيف بيزوس", note:"ثروة مرجعية من Forbes — مقر أمازون", coords:[-122.33,47.61] },
+  { name:"برنارد أرنو", note:"ثروة مرجعية من Forbes — مقر LVMH باريس", coords:[2.32,48.87] },
+  { name:"مقر آبل — كوبرتينو", note:"من أكبر شركات العالم قيمة سوقية", coords:[-122.01,37.33] },
+  { name:"مقر أرامكو — الظهران", note:"أكبر شركة نفط في العالم", coords:[50.13,26.31] },
+  { name:"مقر مايكروسوفت — ريدموند", note:"شركات التكنولوجيا الكبرى", coords:[-122.12,47.64] }
+];
+
+/* ---------- 30 verified LIVE world cameras (YouTube Live) ----------
+   Every entry was verified live on 22 Nov 2026 (isLiveContent + playableInEmbed)
+   in the build research. Makkah & Madinah use the channel live_stream embed so
+   the player follows the current official broadcast automatically. */
+var WORLD_CAMS = [
+  { title:"تايمز سكوير – التقاطع", city:"نيويورك", country:"الولايات المتحدة", source:"EarthCam", coords:[-73.9859724,40.7570095], embed:"https://www.youtube.com/embed/KHy_n-EMWY8?autoplay=1&mute=1", watch:"https://www.youtube.com/watch?v=KHy_n-EMWY8" },
+  { title:"تايمز سكوير الشمالي 4K", city:"نيويورك", country:"الولايات المتحدة", source:"EarthCam", coords:[-73.9865339,40.7562129], embed:"https://www.youtube.com/embed/ZxCeWQ3Lcig?autoplay=1&mute=1", watch:"https://www.youtube.com/watch?v=ZxCeWQ3Lcig" },
+  { title:"تمثال الحرية", city:"نيويورك", country:"الولايات المتحدة", source:"EarthCam", coords:[-74.0445482,40.6892532], embed:"https://www.youtube.com/embed/o5Ie_LpZ9uk?autoplay=1&mute=1", watch:"https://www.youtube.com/watch?v=o5Ie_LpZ9uk" },
+  { title:"جسر بروكلين", city:"نيويورك", country:"الولايات المتحدة", source:"EarthCam", coords:[-74.0012949,40.7097438], embed:"https://www.youtube.com/embed/tErYxn2UM5Y?autoplay=1&mute=1", watch:"https://www.youtube.com/watch?v=tErYxn2UM5Y" },
+  { title:"سكاي ديك شيكاغو", city:"شيكاغو", country:"الولايات المتحدة", source:"EarthCam", coords:[-87.6359612,41.878738], embed:"https://www.youtube.com/embed/W9ghgZD6Ugw?autoplay=1&mute=1", watch:"https://www.youtube.com/watch?v=W9ghgZD6Ugw" },
+  { title:"نصب واشنطن", city:"واشنطن", country:"الولايات المتحدة", source:"EarthCam", coords:[-77.0352426,38.8894754], embed:"https://www.youtube.com/embed/mG2gAWY_Guw?autoplay=1&mute=1", watch:"https://www.youtube.com/watch?v=mG2gAWY_Guw" },
+  { title:"عبور آبي رود", city:"لندن", country:"المملكة المتحدة", source:"EarthCam", coords:[-0.1771231,51.5318549], embed:"https://www.youtube.com/embed/zMCea32gpmg?autoplay=1&mute=1", watch:"https://www.youtube.com/watch?v=zMCea32gpmg" },
+  { title:"جسر لندن ونهر التايمز", city:"لندن", country:"المملكة المتحدة", source:"Beach Life Cams", coords:[-0.0876715,51.508049], embed:"https://www.youtube.com/embed/MXmzsjABC-U?autoplay=1&mute=1", watch:"https://www.youtube.com/watch?v=MXmzsjABC-U" },
+  { title:"المسجد الحرام – مكة (رسمي)", city:"مكة المكرمة", country:"السعودية", source:"قناة القرآن الكريم", coords:[39.8248709,21.4245589], embed:"https://www.youtube.com/embed/live_stream?channel=UCos52azQNBgW63_9uDJoPDA&autoplay=1&mute=1", watch:"https://www.youtube.com/watch?v=IsJTAdC3-Jw" },
+  { title:"المسجد الحرام – مكة", city:"مكة المكرمة", country:"السعودية", source:"القرآن الكريم AlQuran4K", coords:[39.8248709,21.4245589], embed:"https://www.youtube.com/embed/u0r_8rrquK4?autoplay=1&mute=1", watch:"https://www.youtube.com/watch?v=u0r_8rrquK4" },
+  { title:"المسجد النبوي – المدينة", city:"المدينة المنورة", country:"السعودية", source:"Naimat — إعادة بث قناة السنة النبوية", coords:[39.611162,24.4686804], embed:"https://www.youtube.com/embed/live_stream?channel=UCROKYPep-UuODNwyipe6JMw&autoplay=1&mute=1", watch:"https://www.youtube.com/watch?v=BtMUUgApnPs" },
+  { title:"تقاطع شيبويا", city:"طوكيو", country:"اليابان", source:"FNN Prime Online", coords:[139.7004982,35.6594951], embed:"https://www.youtube.com/embed/dfVK7ld38Ys?autoplay=1&mute=1", watch:"https://www.youtube.com/watch?v=dfVK7ld38Ys" },
+  { title:"شيبويا آي فيجن", city:"طوكيو", country:"اليابان", source:"SHIBUYA AI Vision", coords:[139.7037784,35.6595793], embed:"https://www.youtube.com/embed/ZTR8FFdF0x8?autoplay=1&mute=1", watch:"https://www.youtube.com/watch?v=ZTR8FFdF0x8" },
+  { title:"تقاطع شينجوكو", city:"طوكيو", country:"اليابان", source:"Tokyo Shinjuku Live Ch", coords:[139.6991102,35.6905828], embed:"https://www.youtube.com/embed/6dp-bvQ7RWo?autoplay=1&mute=1", watch:"https://www.youtube.com/watch?v=6dp-bvQ7RWo" },
+  { title:"خليج طوكيو", city:"طوكيو", country:"اليابان", source:"Tokyo Views LIVE", coords:[139.8477024,35.4700117], embed:"https://www.youtube.com/embed/_k-5U7IeK8g?autoplay=1&mute=1", watch:"https://www.youtube.com/watch?v=_k-5U7IeK8g" },
+  { title:"جبل فوجي", city:"كاواغوتشيكو", country:"اليابان", source:"フジヤマNAVI", coords:[138.7448243,35.5130603], embed:"https://www.youtube.com/embed/Sv9hcJ3k5h4?autoplay=1&mute=1", watch:"https://www.youtube.com/watch?v=Sv9hcJ3k5h4" },
+  { title:"برج إيفل", city:"باريس", country:"فرنسا", source:"Surveillance Map Foundation", coords:[2.2945006,48.8582599], embed:"https://www.youtube.com/embed/UHlDzWrBEPI?autoplay=1&mute=1", watch:"https://www.youtube.com/watch?v=UHlDzWrBEPI" },
+  { title:"حائط البراق – الساحة الرئيسية", city:"القدس", country:"فلسطين", source:"مؤسسة تراث حائط البراق (رسمي)", coords:[35.2344484,31.7767469], embed:"https://www.youtube.com/embed/LMHUcDktP-w?autoplay=1&mute=1", watch:"https://www.youtube.com/watch?v=LMHUcDktP-w" },
+  { title:"حائط البراق", city:"القدس", country:"فلسطين", source:"EarthCam", coords:[35.2344484,31.7767469], embed:"https://www.youtube.com/embed/77akujLn4k8?autoplay=1&mute=1", watch:"https://www.youtube.com/watch?v=77akujLn4k8" },
+  { title:"ساحة القديس بطرس – الفاتيكان", city:"الفاتيكان", country:"الفاتيكان", source:"Vatican News", coords:[12.4537105,41.9021569], embed:"https://www.youtube.com/embed/03pYP2Nmreo?autoplay=1&mute=1", watch:"https://www.youtube.com/watch?v=03pYP2Nmreo" },
+  { title:"ساحة ديل كامبو – سيينا", city:"سيينا", country:"إيطاليا", source:"Paesaggi Digitali", coords:[11.3315583,43.3184391], embed:"https://www.youtube.com/embed/d6IstgeKiiU?autoplay=1&mute=1", watch:"https://www.youtube.com/watch?v=d6IstgeKiiU" },
+  { title:"أفق ميلانو", city:"ميلانو", country:"إيطاليا", source:"Espansione Tv", coords:[9.1906398,45.4639102], embed:"https://www.youtube.com/embed/dsoM6TYIkOI?autoplay=1&mute=1", watch:"https://www.youtube.com/watch?v=dsoM6TYIkOI" },
+  { title:"بحيرة جنيف", city:"جنيف", country:"سويسرا", source:"Vision-Environnement", coords:[6.1466014,46.2017559], embed:"https://www.youtube.com/embed/3HsL6AA6rPM?autoplay=1&mute=1", watch:"https://www.youtube.com/watch?v=3HsL6AA6rPM" },
+  { title:"ساحة دام – أمستردام", city:"أمستردام", country:"هولندا", source:"Now4Rent", coords:[4.8923511,52.3731162], embed:"https://www.youtube.com/embed/Gd9d4q6WvUY?autoplay=1&mute=1", watch:"https://www.youtube.com/watch?v=Gd9d4q6WvUY" },
+  { title:"تالين – المدينة القديمة", city:"تالين", country:"إستونيا", source:"360PANO", coords:[24.7491417,59.4404237], embed:"https://www.youtube.com/embed/VhVgZi2lGv0?autoplay=1&mute=1", watch:"https://www.youtube.com/watch?v=VhVgZi2lGv0" },
+  { title:"شارع سوخومفيت – بانكوك", city:"بانكوك", country:"تايلند", source:"The Real Samui Webcam", coords:[100.5818548,13.7218099], embed:"https://www.youtube.com/embed/Q71sLS8h9a4?autoplay=1&mute=1", watch:"https://www.youtube.com/watch?v=Q71sLS8h9a4" },
+  { title:"جبل الطاولة – كيب تاون", city:"كيب تاون", country:"جنوب أفريقيا", source:"Table Mountain Live Stream", coords:[18.4038716,-33.9590635], embed:"https://www.youtube.com/embed/vOLCjL4kv-w?autoplay=1&mute=1", watch:"https://www.youtube.com/watch?v=vOLCjL4kv-w" },
+  { title:"شارع فريمونت – لاس فيغاس", city:"لاس فيغاس", country:"الولايات المتحدة", source:"Justin Clouse", coords:[-115.1391894,36.1686022], embed:"https://www.youtube.com/embed/ZvYvZLfPatQ?autoplay=1&mute=1", watch:"https://www.youtube.com/watch?v=ZvYvZLfPatQ" },
+  { title:"لاس فيغاس ستريب", city:"لاس فيغاس", country:"الولايات المتحدة", source:"LV Strip Cam", coords:[-115.1742536,36.1194215], embed:"https://www.youtube.com/embed/C1hrfERKzbg?autoplay=1&mute=1", watch:"https://www.youtube.com/watch?v=C1hrfERKzbg" },
+  { title:"أفق هونغ كونغ", city:"هونغ كونغ", country:"الصين", source:"Brainrolling Workshop", coords:[114.1145688,22.3235534], embed:"https://www.youtube.com/embed/OtreHvXgAoA?autoplay=1&mute=1", watch:"https://www.youtube.com/watch?v=OtreHvXgAoA" }
+];
+
+function toFC(list, fn){
+  return { type:"FeatureCollection", features: list.map(function(it, i){
+    return { type:"Feature", id:i, geometry:{ type:"Point", coordinates: it.coords }, properties: fn(it) };
+  })};
+}
+
+/* ---------- Layer registry ---------- */
+var LAYERS = [
+  { id:"flights",    name:"الطائرات",        sub:"ADS-B حي — مدنية وعسكرية", color:"#5aa9e6", icon:"plane",    tag:"live", on:true },
+  { id:"ships",      name:"السفن والمضائق",  sub:"AIS حي بمفتاح AISHub المجاني + مضائق العالم", color:"#7bc47f", icon:"ship", tag:"live", on:true },
+  { id:"buildings",  name:"المباني والبيوت", sub:"حدود مبانٍ حقيقية من OpenStreetMap — تظهر من زوم ١٥", color:"#9db4d0", icon:"building", tag:"live", on:true },
+  { id:"quakes",     name:"الأحداث الحية",   sub:"زلازل USGS لآخر ٢٤ ساعة",  color:"#e5534b", icon:"quake",    tag:"live", on:true },
+  { id:"events",     name:"حرائق وعواصف",    sub:"NASA EONET — أحداث مفتوحة", color:"#e2a63d", icon:"flame",    tag:"live", on:true },
+  { id:"cameras",    name:"الكاميرات",       sub:"بث مباشر عالمي — ٣٠ كاميرا YouTube Live موثقة + بوابات Caltrans و WSDOT، انقر أي كاميرا لتشاهدها بعينك", color:"#3ec6b8", icon:"camera", tag:"live", on:true },
+  { id:"conflict",   name:"النزاعات",        sub:"مسارح تحت المراقبة وجبهات نشطة", color:"#b48ce0", icon:"target", tag:"demo", on:false },
+  { id:"infra",      name:"البنية التحتية",  sub:"مطارات وموانئ ومحطات طاقة وسدود", color:"#f0c169", icon:"building", tag:"demo", on:false },
+  { id:"people",     name:"أشخاص وشركات",    sub:"ثروات Forbes ومقار كبرى الشركات", color:"#d8d3c3", icon:"person", tag:"demo", on:false }
+];
+var counts = {};
+
+var layerBtns = {};
+function buildPanel(){
+  var wrap = $("layers");
+  wrap.innerHTML = "";
+  LAYERS.forEach(function(L){
+    var b = document.createElement("button");
+    b.type = "button";
+    b.className = "layer" + (L.on ? " on" : "");
+    b.setAttribute("aria-pressed", L.on ? "true" : "false");
+    b.innerHTML =
+      '<span class="sw-ico" aria-hidden="true">' + svgIcon(L.icon, L.color, 20) + '</span>' +
+      '<span class="lt"><b>' + esc(L.name) +
+        (L.tag === "live" ? '<span class="live-tag">حي</span>' : '<span class="demo-tag">عرض</span>') +
+      '</b><small>' + esc(L.sub) + '</small></span>' +
+      '<span class="cnt" data-cnt="' + L.id + '"></span>' +
+      '<span class="tg" aria-hidden="true"></span>';
+    b.addEventListener("click", function(){ setLayerOn(L.id, !L.on); });
+    layerBtns[L.id] = b;
+    wrap.appendChild(b);
+  });
+}
+function setLayerOn(id, on){
+  for (var i=0;i<LAYERS.length;i++){
+    if (LAYERS[i].id === id){
+      LAYERS[i].on = on;
+      var b = layerBtns[id];
+      if (b){ b.classList.toggle("on", on); b.setAttribute("aria-pressed", on ? "true" : "false"); }
+      setLayerVisibility(id, on);
+      if (id === "ships" && on && !aishubKey)
+        toast("المضائق ظاهرة الآن — الصق مفتاح AISHub المجاني في اللوحة لترى السفن الحية");
+      return;
+    }
+  }
+}
+function setCount(id, n){
+  counts[id] = n;
+  var el = document.querySelector('[data-cnt="' + id + '"]');
+  if (el) el.textContent = (n == null ? "" : fmt(n));
+}
+function setLayerVisibility(id, on){
+  var vis = on ? "visible" : "none";
+  if (map) (LAYER_IDS[id] || []).forEach(function(lid){
+    if (map.getLayer(lid)) map.setLayoutProperty(lid, "visibility", vis);
+  });
+  if (id === "flights" && on) loadFlights();
+  if (id === "cameras" && on) loadCameras();
+  if (id === "ships" && on) loadShips();
+  if (id === "buildings" && on) loadBuildings();
+  if (id === "quakes" && on) loadQuakes();
+  if (id === "events" && on) loadEvents();
+}
+var LAYER_IDS = {
+  flights: ["flights-c", "flights-h"],
+  ships: ["vessels-c", "vessels-h", "straits-c"],
+  buildings: ["buildings-f", "buildings-l"],
+  quakes: ["quakes-c", "quakes-h"],
+  events: ["events-c"],
+  cameras: ["cameras-c", "wcams-c"],
+  conflict: ["conflict-c"],
+  infra: ["infra-c"],
+  people: ["people-c"]
+};
+
+/* ---------- Drawn SVG marker icons (one real shape per layer — never emoji) ---------- */
+var ICON_INNER = {
+  /* Top-view plane pointing straight up (north = 0°), perfectly symmetric,
+     so icon-rotate = heading lines the nose up with the direction of travel */
+  plane: function(c){ return '<path fill="' + c + '" d="M12 1.8l1.2 2.4.6 4.8 7.7 4.2-7.7.2-.4 3.8 3.8 2.6-3.8-.2-.7 2.7h-1.4l-.7-2.7-3.8.2 3.8-2.6-.4-3.8-7.7-.2 7.7-4.2.6-4.8z"/>'; },
+  ship: function(c){ return '<path fill="' + c + '" d="M2.6 13.8h18.8l-1.9 5a2 2 0 0 1-1.9 1.3H6.4a2 2 0 0 1-1.9-1.3l-1.9-5zM5.2 13.8V10h4.6v3.8zM10.4 13.8V10h4.6v3.8zM15.8 13.8V7.6h3.4v6.2zM16.6 7.6V5.4h1.8v2.2z"/>'; },
+  anchor: function(c){ return '<g fill="none" stroke="' + c + '" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="4.8" r="2.1"/><path d="M12 7v13M8.2 10.2h7.6M5 13.5c.8 3.8 3.4 6.5 7 6.5s6.2-2.7 7-6.5M5 13.5l-1.3 3.2M5 13.5l3.2 1.3M19 13.5l1.3 3.2M19 13.5l-3.2 1.3"/></g>'; },
+  camera: function(c){ return '<path fill="' + c + '" d="M4.6 7.3h7.9a2 2 0 0 1 2 2v5.4a2 2 0 0 1-2 2H4.6a2 2 0 0 1-2-2V9.3a2 2 0 0 1 2-2z"/><path fill="' + c + '" d="M15.7 10.6l5.7-2.9v8.6l-5.7-2.9z"/><circle cx="7.6" cy="10.4" r="1.15" fill="#0a0e13"/>'; },
+  flame: function(c){ return '<path fill="' + c + '" d="M12 22c4.4 0 7.5-3 7.5-7.3 0-3.2-2-5.6-3.4-7.6C14.9 5.4 13.6 3.7 13.5 2c-3 2-4.6 4.3-4.7 7-.5-.6-.8-1.4-.9-2.3C6.4 8.6 4.5 11.3 4.5 14.7 4.5 19 7.6 22 12 22z"/>'; },
+  quake: function(c){ return '<path d="M2.5 12h4l2.5-6.5 4 13 2.5-6.5h6" fill="none" stroke="' + c + '" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>'; },
+  target: function(c){ return '<g fill="none" stroke="' + c + '" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="7.6"/><circle cx="12" cy="12" r="3.4"/><path d="M12 1.8v3.2M12 19v3.2M1.8 12h3.2M19 12h3.2"/></g>'; },
+  building: function(c){ return '<path d="M5 21V4.5A1.5 1.5 0 0 1 6.5 3h7A1.5 1.5 0 0 1 15 4.5V21M15 9.5h2.5A1.5 1.5 0 0 1 19 11v10M2.8 21h18.4" fill="none" stroke="' + c + '" stroke-width="2" stroke-linecap="round"/><path fill="' + c + '" d="M8 6.5h1.7v1.7H8zM11.3 6.5H13v1.7h-1.7zM8 10.5h1.7v1.7H8zM11.3 10.5H13v1.7h-1.7zM8 14.5h1.7v1.7H8zM11.3 14.5H13v1.7h-1.7z"/>'; },
+  person: function(c){ return '<g fill="' + c + '"><circle cx="12" cy="7.6" r="3.6"/><path d="M4.8 20.6c.9-4.1 3.7-6.4 7.2-6.4s6.3 2.3 7.2 6.4z"/></g>'; }
+};
+function svgIcon(name, color, px){
+  return '<svg width="' + px + '" height="' + px + '" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">' +
+    (ICON_INNER[name] ? ICON_INNER[name](color) : "") + '</svg>';
+}
+/* MapLibre image registry: rasterised at 72px so icons stay crisp at every zoom */
+var MAP_ICON_DEFS = {
+  "icon-plane":     svgIcon("plane", "#5aa9e6", 72),
+  "icon-plane-red": svgIcon("plane", "#e5534b", 72),
+  "icon-ship":      svgIcon("ship", "#7bc47f", 72),
+  "icon-anchor":    svgIcon("anchor", "#7bc47f", 72),
+  "icon-camera":    svgIcon("camera", "#3ec6b8", 72),
+  "icon-flame":     svgIcon("flame", "#e2a63d", 72),
+  "icon-quake":     svgIcon("quake", "#ff7a6b", 72),
+  "icon-target":    svgIcon("target", "#b48ce0", 72),
+  "icon-building":  svgIcon("building", "#f0c169", 72),
+  "icon-person":    svgIcon("person", "#d8d3c3", 72)
+};
+var iconImgCache = {};
+function loadMapIcons(){
+  if (!map) return;
+  Object.keys(MAP_ICON_DEFS).forEach(function(name){
+    if (map.hasImage(name)) return;
+    var cached = iconImgCache[name];
+    if (cached && cached.complete && cached.naturalWidth){
+      try { map.addImage(name, cached); } catch (e) {}
+      return;
+    }
+    var img = new Image();
+    iconImgCache[name] = img;
+    img.onload = function(){
+      try { if (map && !map.hasImage(name)) map.addImage(name, img); } catch (e) {}
+    };
+    img.src = "data:image/svg+xml;charset=utf-8," + encodeURIComponent(MAP_ICON_DEFS[name]);
+  });
+}
+
+/* ---------- Sources & layers on map ---------- */
+function emptyFC(){ return { type:"FeatureCollection", features:[] }; }
+
+function addSymbolLayer(srcId, layerId, data, layout, paint){
+  if (!map.getSource(srcId)) map.addSource(srcId, { type:"geojson", data: data || emptyFC() });
+  if (!map.getLayer(layerId)){
+    map.addLayer({
+      id: layerId, type:"symbol", source: srcId,
+      layout: Object.assign({ "icon-allow-overlap": true, "icon-ignore-placement": true }, layout || {}),
+      paint: Object.assign({
+        "icon-halo-color": "rgba(5,8,12,.88)",
+        "icon-halo-width": 1.4,
+        "icon-opacity": 0.97
+      }, paint || {})
+    });
+  }
+}
+
+function initLayers(){
+  applyGlobe();
+  addSatellite();
+  loadMapIcons();
+
+  /* Flights: plane icons rotated to heading + heading ticks (lines in their own source) */
+  map.addSource("flights", { type:"geojson", data: emptyFC() });
+  map.addLayer({ id:"flights-h", type:"line", source:"flights",
+    paint:{ "line-color":"#5aa9e6", "line-width":1.4, "line-opacity":0.65 } });
+  addSymbolLayer("flights-pts", "flights-c", emptyFC(), {
+    "icon-image": ["case", ["==", ["get", "emergency"], true], "icon-plane-red", "icon-plane"],
+    "icon-size": ["interpolate", ["linear"], ["zoom"], 1.5, 0.34, 5, 0.44, 9, 0.58, 14, 0.72],
+    "icon-rotate": ["coalesce", ["get", "track"], 0],
+    "icon-rotation-alignment": "map"
+  });
+
+  /* Earthquakes: seismic icon sized by magnitude over a soft halo ring */
+  map.addSource("quakes", { type:"geojson", data: emptyFC() });
+  map.addLayer({ id:"quakes-h", type:"circle", source:"quakes",
+    paint:{
+      "circle-radius":["interpolate",["linear"],["get","mag"],0,7,3,13,6,26,8,40],
+      "circle-color":"#e5534b", "circle-opacity":0.14
+    }});
+  addSymbolLayer("quakes", "quakes-c", null, {
+    "icon-image": "icon-quake",
+    "icon-size": ["interpolate", ["linear"], ["get", "mag"], 0, 0.34, 4, 0.46, 6, 0.62, 8, 0.8]
+  });
+
+  addSymbolLayer("events-src", "events-c", emptyFC(), {
+    "icon-image": "icon-flame",
+    "icon-size": ["interpolate", ["linear"], ["zoom"], 1.5, 0.34, 8, 0.5]
+  });
+
+  /* Live vessels (AISHub) — ship icons; heading ticks live in the lines source */
+  map.addSource("vessels", { type:"geojson", data: emptyFC() });
+  map.addLayer({ id:"vessels-h", type:"line", source:"vessels",
+    paint:{ "line-color":"#7bc47f", "line-width":1.4, "line-opacity":0.65 } });
+  addSymbolLayer("vessels-pts", "vessels-c", emptyFC(), {
+    "icon-image": "icon-ship",
+    "icon-size": ["interpolate", ["linear"], ["zoom"], 1.5, 0.34, 8, 0.5]
+  });
+  addSymbolLayer("straits-src", "straits-c",
+    toFC(STRAITS, function(s){ return { kind:"strait", title:s.name, note:s.note }; }), {
+    "icon-image": "icon-anchor",
+    "icon-size": ["interpolate", ["linear"], ["zoom"], 1.5, 0.36, 8, 0.5]
+  });
+
+  /* Real building footprints (OpenStreetMap via Overpass) — house-level zoom */
+  map.addSource("buildings", { type:"geojson", data: emptyFC() });
+  map.addLayer({ id:"buildings-f", type:"fill", source:"buildings", minzoom:14.5,
+    paint:{ "fill-color":"#a8c0dd", "fill-opacity":0.34 } });
+  map.addLayer({ id:"buildings-l", type:"line", source:"buildings", minzoom:14.5,
+    paint:{ "line-color":"#dcebfb", "line-width":1, "line-opacity":0.75 } });
+
+  /* Live cameras — filled by loadCameras() from official DOT services */
+  addSymbolLayer("cameras-src", "cameras-c", emptyFC(), {
+    "icon-image": "icon-camera",
+    "icon-size": ["interpolate", ["linear"], ["zoom"], 1.5, 0.32, 8, 0.48]
+  });
+
+  /* World live cameras — 30 verified YouTube Live streams, visible worldwide */
+  addSymbolLayer("wcams-src", "wcams-c",
+    toFC(WORLD_CAMS, function(c){ return { kind:"wcam", title:c.title, city:c.city, country:c.country, src:c.source, embed:c.embed, watch:c.watch }; }), {
+    "icon-image": "icon-camera",
+    "icon-size": ["interpolate", ["linear"], ["zoom"], 1.5, 0.42, 8, 0.58]
+  });
+
+  /* Tracked-flight trail — the route line of the flight you tapped */
+  if (!map.getSource("track-src")) map.addSource("track-src", { type:"geojson", data: emptyFC() });
+  if (!map.getLayer("track-line")){
+    map.addLayer({ id:"track-line", type:"line", source:"track-src",
+      paint:{ "line-color":"#e2a63d", "line-width":2.2, "line-opacity":0.9, "line-dasharray":[1.6,1.1] } });
+  }
+  addSymbolLayer("conflict-src", "conflict-c",
+    toFC(THEATERS, function(t){ return { kind:"theater", title:t.name, note:t.note }; }), {
+    "icon-image": "icon-target",
+    "icon-size": ["interpolate", ["linear"], ["zoom"], 1.5, 0.38, 8, 0.54]
+  });
+  addSymbolLayer("infra-src", "infra-c",
+    toFC(INFRA, function(x){ return { kind:"infra", title:x.name, infraKind:x.kind }; }), {
+    "icon-image": "icon-building",
+    "icon-size": ["interpolate", ["linear"], ["zoom"], 1.5, 0.32, 8, 0.48]
+  });
+  addSymbolLayer("people-src", "people-c",
+    toFC(PEOPLE, function(p){ return { kind:"person", title:p.name, note:p.note }; }), {
+    "icon-image": "icon-person",
+    "icon-size": ["interpolate", ["linear"], ["zoom"], 1.5, 0.32, 8, 0.48]
+  });
+
+  setCount("cameras", WORLD_CAMS.length);
+  setCount("ships", STRAITS.length);
+  setCount("conflict", THEATERS.length);
+  setCount("infra", INFRA.length);
+  setCount("people", PEOPLE.length);
+
+  LAYERS.forEach(function(L){ setLayerVisibility(L.id, L.on); });
+
+  bindClicks();
+  loadFlights(); loadShips(); loadQuakes(); loadEvents(); loadCameras(); startISS();
+  map.on("moveend", debounce(function(){
+    if (layerOn("flights")) loadFlights();
+    if (layerOn("ships")) loadShips();
+    if (layerOn("buildings")) loadBuildings();
+    if (layerOn("cameras")) loadCameras();
+  }, 900));
+}
+function layerOn(id){ for (var i=0;i<LAYERS.length;i++) if (LAYERS[i].id===id) return LAYERS[i].on; return false; }
+function debounce(fn, ms){ var t; return function(){ clearTimeout(t); t = setTimeout(fn, ms); }; }
+
+/* ---------- Live data: flights (adsb.lol) ---------- */
+var flightsBusy = false;
+var flightFilter = "all";   /* all | civ | mil | emg */
+/* Hub points so the zoomed-out globe is populated worldwide, not only Iraq */
+var FLIGHT_HUBS = [
+  [33.3, 44.4], [50.5, 10.0], [40.6, -74.0], [35.6, 139.7],
+  [-33.8, 151.2], [-23.5, -46.6], [25.3, 55.3], [1.4, 104.0], [55.7, 37.6]
+];
+function renderFlights(ac, global){
+  var feats = [], lines = [];
+  ac.forEach(function(a){
+    if (a.lat == null || a.lon == null) return;
+    var emergency = (a.squawk === "7500" || a.squawk === "7600" || a.squawk === "7700");
+    var mil = flightFilter === "mil" || !!(a.dbFlags && (a.dbFlags & 1));
+    if (flightFilter === "civ" && mil) return;
+    if (flightFilter === "emg" && !emergency) return;
+    feats.push({ type:"Feature",
+      geometry:{ type:"Point", coordinates:[a.lon, a.lat] },
+      properties:{
+        kind:"flight",
+        hex: a.hex || "",
+        title: (a.flight || a.r || "رحلة بدون نداء").trim(),
+        callsign:(a.flight || "").trim(), reg:a.r || "", type:a.t || "",
+        alt: a.alt_baro, gs: a.gs, track: a.track, squawk: a.squawk || "",
+        desc: a.desc || "", emergency: emergency, mil: mil, ownOp: a.ownOp || ""
+      }});
+    if (a.track != null){
+      var rad = a.track * Math.PI / 180, d = 0.55;
+      lines.push({ type:"Feature",
+        geometry:{ type:"LineString", coordinates:[
+          [a.lon, a.lat],
+          [a.lon + Math.sin(rad) * d, a.lat + Math.cos(rad) * d * 0.8]
+        ]},
+        properties:{} });
+    }
+  });
+  if (map && map.getSource("flights")) map.getSource("flights").setData({ type:"FeatureCollection", features: lines });
+  if (map && map.getSource("flights-pts")) map.getSource("flights-pts").setData({ type:"FeatureCollection", features: feats });
+  setCount("flights", feats.length);
+  $("st-flights").textContent = fmt(feats.length);
+  var label = flightFilter === "mil" ? " طائرة عسكرية" : flightFilter === "emg" ? " طائرة بحالة طوارئ" : " طائرة";
+  setStatus(global
+    ? "بيانات حية محدثة — " + fmt(feats.length) + label + " حول العالم الآن"
+    : "بيانات حية محدثة — " + fmt(feats.length) + label + " حول مركز الخريطة الآن");
+}
+function loadFlights(){
+  if (flightsBusy || !map || !map.getSource("flights")) return;
+  flightsBusy = true;
+  var done = function(){ flightsBusy = false; };
+  if (flightFilter === "mil"){
+    /* adsb.lol military feed — every military aircraft tracked worldwide */
+    fetch("https://api.adsb.lol/v2/mil").then(function(r){ return r.json(); })
+    .then(function(j){ renderFlights((j && j.ac) || [], true); })
+    .catch(function(){ setStatus("تعذر جلب بيانات الطائرات العسكرية الآن — تحقق من الاتصال"); })
+    .finally(done);
+    return;
+  }
+  var c = map.getCenter();
+  var global = map.getZoom() < 4;
+  var centers = global ? FLIGHT_HUBS : [[c.lat, c.lng]];
+  var fetches = centers.map(function(pt){
+    var url = "https://api.adsb.lol/v2/point/" + pt[0].toFixed(4) + "/" + pt[1].toFixed(4) + "/250";
+    return fetch(url).then(function(r){ return r.json(); })
+      .then(function(j){ return (j && j.ac) || []; })
+      .catch(function(){ return []; });
+  });
+  Promise.all(fetches).then(function(lists){
+    var seen = {}, ac = [];
+    lists.forEach(function(list){
+      list.forEach(function(a){
+        var key = a.hex || ((a.r || "") + "|" + (a.flight || "") + "|" + a.lat + "|" + a.lon);
+        if (seen[key]) return;
+        seen[key] = true; ac.push(a);
+      });
+    });
+    renderFlights(ac, global);
+  }).catch(function(){
+    setStatus("تعذر جلب بيانات الطائرات الآن — تحقق من الاتصال");
+  }).finally(done);
+}
+document.querySelectorAll("[data-ff]").forEach(function(chip){
+  chip.addEventListener("click", function(){
+    document.querySelectorAll("[data-ff]").forEach(function(x){ x.classList.remove("active"); });
+    chip.classList.add("active");
+    flightFilter = chip.getAttribute("data-ff");
+    if (!layerOn("flights")) setLayerOn("flights", true);
+    loadFlights();
+  });
+});
+
+/* ---------- Live data: ships (AISHub, user's free key) ---------- */
+var aishubKey = "";
+var shipsBusy = false;
+function shipTypeLabel(code){
+  code = parseInt(code, 10);
+  if (isNaN(code)) return "سفينة";
+  if (code === 30) return "سفينة صيد";
+  if (code === 31 || code === 32) return "سفينة قطر وسحب";
+  if (code === 33) return "سفينة خدمات خاصة";
+  if (code === 34) return "سفينة غوص";
+  if (code === 35) return "سفينة عسكرية";
+  if (code === 36) return "قارب شراعي";
+  if (code === 37) return "يخت / قارب ترفيه";
+  if (code >= 40 && code <= 49) return "عبّارة عالية السرعة";
+  if (code === 50) return "سفينة إرشاد";
+  if (code === 51) return "بحث وإنقاذ";
+  if (code === 52) return "قاطرة";
+  if (code === 55) return "إنفاذ قانون";
+  if (code >= 60 && code <= 69) return "سفينة ركاب";
+  if (code >= 70 && code <= 79) return "سفينة شحن";
+  if (code >= 80 && code <= 89) return "ناقلة";
+  return "سفينة";
+}
+function aisNote(html){ var n = $("ais-note"); if (n) n.innerHTML = html; }
+function loadShips(){
+  if (!map || !map.getSource("vessels")) return;
+  if (!aishubKey) return;   /* straits stay visible; no fake vessels, ever */
+  if (shipsBusy) return;
+  shipsBusy = true;
+  var b = map.getBounds(), c = map.getCenter();
+  var s = Math.max(-85, b.getSouth()), n = Math.min(85, b.getNorth());
+  var w = b.getWest(), e = b.getEast();
+  if (e - w > 36){ w = c.lng - 18; e = c.lng + 18; }   /* keep the AIS query near the view centre when zoomed far out */
+  if (n - s > 24){ s = Math.max(-85, c.lat - 12); n = Math.min(85, c.lat + 12); }
+  var url = "https://data.aisHub.net/ws.php?username=" + encodeURIComponent(aishubKey) +
+    "&format=1&output=json&compress=0" +
+    "&latmin=" + s.toFixed(3) +
+    "&latmax=" + n.toFixed(3) +
+    "&lonmin=" + w.toFixed(3) +
+    "&lonmax=" + e.toFixed(3);
+  fetch(url).then(function(r){ return r.json(); }).then(function(j){
+    if (!j || !j[0] || j[0].ERROR){
+      aisNote('<span class="bad">رفض AISHub الطلب.</span> تحقق من المفتاح — اسم المستخدم من حسابك المجاني — ثم أعد الربط. قد يكون حسابك لم يُفعَّل بعد أو تجاوزت حصته.');
+      setCount("ships", STRAITS.length);
+      return;
+    }
+    var vessels = j[1] || [];
+    var feats = [], lines = [];
+    vessels.forEach(function(v){
+      var lat = parseFloat(v.LATITUDE), lon = parseFloat(v.LONGITUDE);
+      if (isNaN(lat) || isNaN(lon)) return;
+      feats.push({ type:"Feature",
+        geometry:{ type:"Point", coordinates:[lon, lat] },
+        properties:{
+          kind:"vessel",
+          title: (v.NAME || ("سفينة " + (v.MMSI || ""))).trim(),
+          mmsi: v.MMSI || "", callsign: v.CALLSIGN || "",
+          vtype: shipTypeLabel(v.TYPE), sog: v.SOG, cog: v.COG,
+          dest: v.DEST || "", navstat: v.NAVSTAT, draught: v.DRAUGHT
+        }});
+      var cog = parseFloat(v.COG), sog = parseFloat(v.SOG);
+      if (!isNaN(cog) && !isNaN(sog) && sog > 0.5){
+        var rad = cog * Math.PI / 180, d = 0.5;
+        lines.push({ type:"Feature",
+          geometry:{ type:"LineString", coordinates:[
+            [lon, lat],
+            [lon + Math.sin(rad) * d, lat + Math.cos(rad) * d * 0.8]
+          ]},
+          properties:{} });
+      }
+    });
+    map.getSource("vessels").setData({ type:"FeatureCollection", features: lines });
+    if (map.getSource("vessels-pts")) map.getSource("vessels-pts").setData({ type:"FeatureCollection", features: feats });
+    setCount("ships", feats.length);
+    aisNote('<span class="ok">متصل — ' + fmt(feats.length) + ' سفينة حية في المشهد الآن.</span> تتحدث البيانات عند تحريك الخريطة. المفتاح في هذه الجلسة فقط.');
+    setStatus("سفن AIS حية محدثة — " + fmt(feats.length) + " سفينة في المشهد");
+  }).catch(function(){
+    aisNote('<span class="bad">تعذر الاتصال بـ AISHub.</span> إما أن المتصفح حجب الطلب أو أن الخدمة مشغولة — حرّك الخريطة أو أعد الربط بعد قليل.');
+  }).finally(function(){ shipsBusy = false; });
+}
+$("ais-apply").addEventListener("click", function(){
+  var v = $("ais-key").value.trim();
+  if (!v){ toast("الصق مفتاح AISHub أولاً"); return; }
+  aishubKey = v;
+  if (!layerOn("ships")) setLayerOn("ships", true);
+  aisNote("جارٍ الاتصال بـ AISHub…");
+  loadShips();
+});
+$("ais-key").addEventListener("keydown", function(e){ if (e.key === "Enter") $("ais-apply").click(); });
+
+/* ---------- Live cameras: official DOT portals (Caltrans + WSDOT) ----------
+   Both are public ArcGIS services that return each camera's real position,
+   its live snapshot URL and (Caltrans) its streaming video URL. Nothing is
+   baked or invented: the map asks the portal for the cameras inside the
+   current view, exactly like the reference site aggregates official feeds. */
+var camsBusy = false;
+function arcgisCamQuery(base, where, outFields){
+  var b = map.getBounds();
+  var env = [b.getWest().toFixed(4), b.getSouth().toFixed(4), b.getEast().toFixed(4), b.getNorth().toFixed(4)].join(",");
+  return base + "?where=" + encodeURIComponent(where) +
+    "&geometry=" + encodeURIComponent(env) + "&geometryType=esriGeometryEnvelope&inSR=4326" +
+    "&spatialRel=esriSpatialRelIntersects&outFields=" + encodeURIComponent(outFields) +
+    "&returnGeometry=true&outSR=4326&resultRecordCount=250&f=json";
+}
+function loadCameras(){
+  if (!map || !map.getSource("cameras-src") || camsBusy) return;
+  if (map.getZoom() < 4.2){
+    setStatus("الكاميرات الحية تظهر عند التقريب — قرّب على كاليفورنيا أو واشنطن، أو دوس زر «كاميرات لوس أنجلوس» باللوحة");
+    return;
+  }
+  camsBusy = true;
+  var calQ = arcgisCamQuery(
+    "https://caltrans-gis.dot.ca.gov/arcgis/rest/services/CHhighway/CCTV/FeatureServer/0/query",
+    "inService='True'",
+    "locationName,nearbyPlace,county,route,direction,currentImageURL,streamingVideoURL,currentImageUpdateFrequency");
+  var waQ = arcgisCamQuery(
+    "https://data.wsdot.wa.gov/arcgis/rest/services/TravelInformation/TravelInfoCamerasWeather/FeatureServer/0/query",
+    "1=1", "CameraTitle,ImageURL");
+  var get = function(u){ return fetch(u).then(function(r){ return r.json(); }).catch(function(){ return null; }); };
+  Promise.all([get(calQ), get(waQ)]).then(function(res){
+    var feats = [], seen = {};
+    function push(lon, lat, props){
+      if (lon == null || lat == null || !props.img || seen[props.img]) return;
+      seen[props.img] = true;
+      feats.push({ type:"Feature", geometry:{ type:"Point", coordinates:[lon, lat] }, properties: props });
+    }
+    var cal = res[0], wa = res[1];
+    if (cal && cal.features) cal.features.forEach(function(f){
+      var a = f.attributes || {}, g = f.geometry || {};
+      push(g.x, g.y, {
+        kind:"camera",
+        title: (a.locationName || "كاميرا مرور").trim(),
+        img: a.currentImageURL || "", video: a.streamingVideoURL || "",
+        freq: parseInt(a.currentImageUpdateFrequency, 10) || 15,
+        place: a.nearbyPlace || "", route: a.route || "", dir: a.direction || "",
+        src: "Caltrans — وزارة نقل كاليفورنيا",
+        portal: "https://dot.ca.gov/"
+      });
+    });
+    if (wa && wa.features) wa.features.forEach(function(f){
+      var a = f.attributes || {}, g = f.geometry || {};
+      push(g.x, g.y, {
+        kind:"camera",
+        title: (a.CameraTitle || "كاميرا مرور").trim(),
+        img: a.ImageURL || "", video: "",
+        freq: 60,
+        place: "", route: "", dir: "",
+        src: "WSDOT — وزارة نقل ولاية واشنطن",
+        portal: "https://wsdot.wa.gov/"
+      });
+    });
+    if (map.getSource("cameras-src")) map.getSource("cameras-src").setData({ type:"FeatureCollection", features: feats });
+    setCount("cameras", feats.length + WORLD_CAMS.length);
+    if (feats.length) setStatus("كاميرات حية من بوابات رسمية — " + fmt(feats.length) + " كاميرا في المشهد، انقر أي كاميرا لتشاهد بثها");
+  }).finally(function(){ camsBusy = false; });
+}
+
+/* ---------- Camera viewer: live video when offered, else auto-refreshing live snapshot ---------- */
+var camTimer = null, camCurrent = null;
+function stopCam(){
+  if (camTimer){ clearInterval(camTimer); camTimer = null; }
+  camCurrent = null;
+  var v = $("d-cam-video");
+  if (v){ try { v.pause(); } catch (e) {} v.removeAttribute("src"); v.style.display = "none"; }
+  var img = $("d-cam-img"); if (img) img.removeAttribute("src");
+  var fr = $("d-cam-frame");
+  if (fr){ fr.removeAttribute("src"); fr.style.display = "none"; }
+  var wrap = document.querySelector(".dm-frame"); if (wrap) wrap.classList.remove("wide");
+}
+function refreshCamImg(){
+  if (!camCurrent) return;
+  var img = $("d-cam-img"), st = $("d-cam-state"), tm = $("d-cam-time");
+  var sep = camCurrent.img.indexOf("?") === -1 ? "?" : "&";
+  var probe = new Image();
+  probe.onload = function(){
+    img.src = probe.src;
+    if (st) st.textContent = "متصلة — تتجدد كل " + camCurrent.freq + " ثانية";
+    if (tm) tm.textContent = new Date().toLocaleTimeString("en-GB", { timeZone:"Asia/Baghdad", hour12:false }) + " بغداد";
+  };
+  probe.onerror = function(){
+    if (st) st.textContent = "تعذر جلب إطار جديد الآن — إعادة المحاولة تلقائياً";
+  };
+  probe.src = camCurrent.img + sep + "_t=" + Date.now();
+}
+function openCamera(p){
+  var freq = Math.min(60, Math.max(8, parseInt(p.freq, 10) || 15));
+  var rows = [ ["المصدر الرسمي", p.src, true] ];
+  if (p.place) rows.push(["أقرب مدينة", p.place, true]);
+  if (p.route) rows.push(["الطريق", p.route]);
+  if (p.dir) rows.push(["اتجاه النظر", p.dir, true]);
+  rows.push(["نمط البث", p.video ? "فيديو حي مباشر من البوابة" : "صورة حية تتجدد كل " + freq + " ثانية من البوابة نفسها", true]);
+  openDetail("كاميرا — بث حي", p.title, rows, p.portal || null);
+  /* openDetail() stops any previous stream and hides the media box; arm ours now */
+  $("d-cam-cap").textContent = "صورة حية تتجدد تلقائياً من بوابة الكاميرا الرسمية";
+  camCurrent = { img: p.img, freq: freq };
+  var media = $("d-media"); media.hidden = false;
+  var img = $("d-cam-img"), vid = $("d-cam-video"), st = $("d-cam-state");
+  st.textContent = "جارٍ الاتصال بالكاميرا…";
+  var act = $("d-act");
+  act.textContent = "تحديث الصورة الآن";
+  act.className = "d-act show";
+  act.onclick = function(){ refreshCamImg(); };
+  if (p.video){
+    vid.style.display = "block"; img.style.display = "none";
+    vid.src = p.video;
+    var pr = vid.play(); if (pr && pr.catch) pr.catch(function(){});
+    vid.onerror = function(){
+      vid.style.display = "none"; img.style.display = "block";
+      refreshCamImg(); camTimer = setInterval(refreshCamImg, camCurrent.freq * 1000);
+    };
+    st.textContent = "فيديو حي مباشر";
+  } else {
+    vid.style.display = "none"; img.style.display = "block";
+    refreshCamImg();
+    camTimer = setInterval(refreshCamImg, camCurrent.freq * 1000);
+  }
+  if (map) map.flyTo({ center: [parseFloat(p._lon), parseFloat(p._lat)], zoom: Math.max(map.getZoom(), 10), duration: 900 });
+}
+
+/* ---------- World camera viewer: tap a world camera → its YouTube Live video plays in the card ---------- */
+function openWorldCam(p){
+  var rows = [
+    ["المدينة", p.city + " — " + p.country, true],
+    ["القناة / المصدر", p.src, true],
+    ["نمط البث", "فيديو حي متواصل الآن — YouTube Live", true],
+    ["التحقق", "بث حي موثّق بتاريخ 22 تشرين الثاني 2026", true]
+  ];
+  openDetail("كاميرا عالمية — بث مباشر", p.title, rows, p.watch || null);
+  /* openDetail() stopped any previous stream; arm the live video now */
+  var media = $("d-media"); media.hidden = false;
+  var img = $("d-cam-img"), vid = $("d-cam-video"), fr = $("d-cam-frame"), st = $("d-cam-state");
+  img.style.display = "none"; vid.style.display = "none"; fr.style.display = "block";
+  document.querySelector(".dm-frame").classList.add("wide");
+  fr.src = p.embed;
+  st.textContent = "بث فيديو حي الآن";
+  $("d-cam-cap").textContent = "بث مباشر من " + p.src + " — يوتيوب لايف";
+  var tm = $("d-cam-time"); if (tm) tm.textContent = "";
+  var act = $("d-act"); act.className = "d-act"; act.onclick = null;
+  if (map) map.flyTo({ center: [parseFloat(p._lon), parseFloat(p._lat)], zoom: Math.max(map.getZoom(), 11), duration: 900 });
+}
+
+/* ---------- Flight live tracking: tap a plane, its card updates every 15s ---------- */
+var trackTimer = null, tracked = null, trackTrail = [];
+function stopTrack(){
+  if (trackTimer){ clearInterval(trackTimer); trackTimer = null; }
+  tracked = null; trackTrail = [];
+  if (map && map.getSource("track-src")) map.getSource("track-src").setData(emptyFC());
+}
+function flightRows(p){
+  var rows = [
+    ["رقم النداء", p.callsign || "—"],
+    ["التسجيل", p.reg || "—"],
+    ["نوع الطائرة", p.type || "—"],
+    ["الوصف", p.desc || "—", true],
+    ["التصنيف", p.mil ? "عسكرية" : "مدنية", true],
+    ["الارتفاع", p.alt === "ground" ? "على الأرض" : fmt(p.alt) + " ft", p.alt === "ground"],
+    ["السرعة الأرضية", p.gs != null && p.gs !== "" ? fmt(Math.round(Number(p.gs))) + " kt" : "—"],
+    ["الاتجاه", p.track != null && p.track !== "" ? Math.round(Number(p.track)) + "°" : "—"],
+    ["كود الطوارئ", p.squawk || "—"]
+  ];
+  if (p.emergency) rows.push(["الحالة", "طوارئ — Squawk " + p.squawk, true]);
+  if (p.ownOp) rows.push(["المشغّل", p.ownOp, true]);
+  return rows;
+}
+function drawTrail(){
+  if (!map || !map.getSource("track-src") || trackTrail.length < 2) return;
+  map.getSource("track-src").setData({ type:"Feature",
+    geometry:{ type:"LineString", coordinates: trackTrail }, properties:{} });
+}
+function openFlight(p, lon, lat){
+  openDetail("طائرة — تتبع حي ADS-B", p.title, flightRows(p), null);
+  /* openDetail() stops any previous track; arm this flight's now */
+  tracked = { hex: p.hex || "", title: p.title };
+  trackTrail = (lon != null && lat != null) ? [[lon, lat]] : [];
+  var act = $("d-act");
+  act.textContent = "التتبع الحي يعمل — تتحدث البطاقة والمسار كل ١٥ ثانية · دوس للإيقاف";
+  act.className = "d-act show tracking";
+  act.onclick = function(){ stopTrack(); act.className = "d-act"; $("detail").classList.remove("open"); };
+  if (!tracked.hex) return;
+  trackTimer = setInterval(function(){
+    fetch("https://api.adsb.lol/v2/hex/" + encodeURIComponent(tracked.hex))
+    .then(function(r){ return r.json(); }).then(function(j){
+      var a = j && j.ac && j.ac[0];
+      if (!a || a.lat == null || a.lon == null) return;
+      trackTrail.push([a.lon, a.lat]);
+      if (trackTrail.length > 60) trackTrail.shift();
+      drawTrail();
+      var np = {
+        callsign: (a.flight || "").trim(), reg: a.r || "", type: a.t || "", desc: a.desc || "",
+        mil: !!(a.dbFlags && (a.dbFlags & 1)), alt: a.alt_baro, gs: a.gs, track: a.track,
+        squawk: a.squawk || "", ownOp: a.ownOp || "",
+        emergency: (a.squawk === "7500" || a.squawk === "7600" || a.squawk === "7700")
+      };
+      var body = $("d-body");
+      body.innerHTML = flightRows(np).map(function(r){
+        return '<div class="d-row"><span>' + esc(r[0]) + '</span><b class="' + (r[2] ? "ar" : "") + '">' + esc(r[1]) + '</b></div>';
+      }).join("");
+      setStatus("تتبع حي — " + (np.callsign || tracked.title) + " على ارتفاع " + (np.alt === "ground" ? "الأرض" : fmt(np.alt) + " قدم"));
+    }).catch(function(){});
+  }, 15000);
+}
+
+/* ---------- Live data: building footprints (Overpass / OpenStreetMap) ---------- */
+var buildingsBusy = false;
+var OVERPASS_ENDPOINTS = [
+  "https://overpass-api.de/api/interpreter",
+  "https://overpass.kumi.systems/api/interpreter"
+];
+function loadBuildings(){
+  if (!map || !map.getSource("buildings") || buildingsBusy) return;
+  if (map.getZoom() < 15) return;   /* footprints only make sense at house level */
+  buildingsBusy = true;
+  var b = map.getBounds();
+  var bbox = [b.getSouth(), b.getWest(), b.getNorth(), b.getEast()]
+    .map(function(x){ return x.toFixed(5); }).join(",");
+  var query = "[out:json][timeout:25];(way[\"building\"](" + bbox + "););out body geom 2500;";
+  var body = "data=" + encodeURIComponent(query);
+  function attempt(idx){
+    return fetch(OVERPASS_ENDPOINTS[idx], {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8" },
+      body: body
+    }).then(function(r){ if (!r.ok) throw new Error("overpass " + r.status); return r.json(); });
+  }
+  attempt(0).catch(function(){ return attempt(1); }).then(function(j){
+    var feats = [];
+    (j.elements || []).forEach(function(el){
+      if (el.type !== "way" || !el.geometry || el.geometry.length < 4) return;
+      var g = el.geometry;
+      var first = g[0], last = g[g.length - 1];
+      if (first.lat !== last.lat || first.lon !== last.lon) return;   /* closed ways only */
+      var t = el.tags || {};
+      feats.push({ type:"Feature",
+        geometry:{ type:"Polygon", coordinates:[ g.map(function(p){ return [p.lon, p.lat]; }) ] },
+        properties:{
+          kind:"building",
+          title: t.name || "مبنى",
+          btype: t.building || "",
+          levels: t["building:levels"] || "",
+          street: t["addr:street"] || "",
+          hnum: t["addr:housenumber"] || "",
+          city: t["addr:city"] || ""
+        }});
+    });
+    if (map.getSource("buildings")) map.getSource("buildings").setData({ type:"FeatureCollection", features: feats });
+    setCount("buildings", feats.length);
+    if (feats.length) setStatus("مبانٍ حقيقية من OpenStreetMap — " + fmt(feats.length) + " مبنى في المشهد، انقر أي مبنى لتفاصيله");
+  }).catch(function(){
+    /* Overpass busy — keep previous footprints, stay quiet */
+  }).finally(function(){ buildingsBusy = false; });
+}
+
+/* ---------- What's here: reverse geocode + weather + country data ---------- */
+var hereToken = 0;
+var WX_LABELS = { 0:"صافي", 1:"غائم جزئياً", 2:"غائم جزئياً", 3:"غائم", 45:"ضباب", 48:"ضباب", 51:"رذاذ خفيف", 53:"رذاذ", 55:"رذاذ", 56:"رذاذ متجمد", 57:"رذاذ متجمد", 61:"مطر خفيف", 63:"مطر", 65:"مطر غزير", 66:"مطر متجمد", 67:"مطر متجمد", 71:"ثلج خفيف", 73:"ثلج", 75:"ثلج كثيف", 77:"ثلج", 80:"زخات خفيفة", 81:"زخات مطر", 82:"زخات غزيرة", 85:"زخات ثلج", 86:"زخات ثلج", 95:"عاصفة رعدية", 96:"عاصفة رعدية مع بَرَد", 99:"عاصفة رعدية مع بَرَد" };
+function whatsHere(e){
+  var tok = ++hereToken;
+  var lat = e.lngLat.lat, lon = e.lngLat.lng;
+  openDetail("ما هذا المكان؟", "جارٍ جلب تفاصيل المكان…", [
+    ["خط العرض", lat.toFixed(4) + "°"],
+    ["خط الطول", lon.toFixed(4) + "°"],
+    ["مستوى التكبير", map.getZoom().toFixed(1)]
+  ], null);
+  var base = "https://nominatim.openstreetmap.org/reverse?format=jsonv2&addressdetails=1&accept-language=ar&zoom=18&lat=" +
+    lat.toFixed(6) + "&lon=" + lon.toFixed(6);
+  fetch(base).then(function(r){ return r.json(); }).then(function(j){
+    if (tok !== hereToken) return;
+    var a = j.address || {};
+    var title = j.name || (j.display_name || "").split(",")[0] || "نقطة على الخريطة";
+    var rows = [];
+    if (j.display_name) rows.push(["العنوان", j.display_name, true]);
+    if (a.road) rows.push(["الشارع", a.road + (a.house_number ? " — رقم " + a.house_number : ""), true]);
+    var area = a.suburb || a.neighbourhood || a.quarter || "";
+    if (area) rows.push(["الحي / المنطقة", area, true]);
+    var city = a.city || a.town || a.village || a.state || "";
+    if (city) rows.push(["المدينة", city, true]);
+    if (a.country) rows.push(["الدولة", a.country, true]);
+    rows.push(["الإحداثيات", lat.toFixed(4) + "° ، " + lon.toFixed(4) + "°"]);
+    openDetail("ما هذا المكان؟", title, rows, null);
+    /* Weather for this exact point — Open-Meteo, free, no key */
+    fetch("https://api.open-meteo.com/v1/forecast?latitude=" + lat.toFixed(4) + "&longitude=" + lon.toFixed(4) +
+      "&current=temperature_2m,wind_speed_10m,weather_code")
+    .then(function(r){ return r.json(); }).then(function(w){
+      if (tok !== hereToken || !w.current) return;
+      rows.push(["طقس المكان الآن", (WX_LABELS[w.current.weather_code] || "") + " — " + Math.round(w.current.temperature_2m) + "°م، رياح " + Math.round(w.current.wind_speed_10m) + " كم/س", true]);
+      openDetail("ما هذا المكان؟", title, rows, null);
+    }).catch(function(){});
+    /* Country card — World Bank indicators, like the reference site */
+    var cc = (a.country_code || "").toUpperCase();
+    if (cc && cc.length === 2){
+      fetch("https://api.worldbank.org/v2/country/" + cc + "?format=json")
+      .then(function(r){ return r.json(); }).then(function(cj){
+        if (tok !== hereToken || !cj[1] || !cj[1][0]) return;
+        var ctry = cj[1][0];
+        if (ctry.capitalCity) rows.push(["عاصمة الدولة", ctry.capitalCity, true]);
+        if (ctry.region && ctry.region.value) rows.push(["المنطقة", ctry.region.value, true]);
+        openDetail("ما هذا المكان؟", title, rows, null);
+        return fetch("https://api.worldbank.org/v2/country/" + cc + "/indicator/SP.POP.TOTAL?format=json&per_page=1");
+      }).then(function(r){ return r ? r.json() : null; }).then(function(pj){
+        if (tok !== hereToken || !pj || !pj[1] || !pj[1][0] || pj[1][0].value == null) return;
+        rows.push(["سكان الدولة (" + pj[1][0].date + ")", fmt(pj[1][0].value)]);
+        openDetail("ما هذا المكان؟", title, rows, null);
+      }).catch(function(){});
+    }
+  }).catch(function(){
+    if (tok !== hereToken) return;
+    openDetail("ما هذا المكان؟", lat.toFixed(3) + "° ، " + lon.toFixed(3) + "°", [
+      ["خط العرض", lat.toFixed(4) + "°"],
+      ["خط الطول", lon.toFixed(4) + "°"],
+      ["التفسير", "تعذر جلب العنوان الآن — انقر أي عنصر ملوّن لعرض بطاقته", true]
+    ], null);
+  });
+}
+
+/* ---------- Live data: earthquakes (USGS) ---------- */
+function loadQuakes(){
+  fetch("https://earthquake.usgs.gov/earthquakes/feed/v1.0/summary/all_day.geojson")
+  .then(function(r){ return r.json(); }).then(function(j){
+    var feats = (j.features || []).map(function(f){
+      var p = f.properties;
+      return { type:"Feature", geometry: f.geometry,
+        properties:{ kind:"quake", title: p.place || "زلزال", mag: p.mag || 0,
+          time: p.time, url: p.url, depth: f.geometry.coordinates[2], tsunami: p.tsunami } };
+    });
+    if (map && map.getSource("quakes")) map.getSource("quakes").setData({ type:"FeatureCollection", features: feats });
+    setCount("quakes", feats.length);
+    $("st-quakes").textContent = fmt(feats.length);
+    feedQuakes = feats; renderFeed();
+  }).catch(function(){});
+}
+
+/* ---------- Live data: natural events (NASA EONET) ---------- */
+var EONET_LABELS = { wildfires:"حريق غابات", severeStorms:"عاصفة شديدة", volcanoes:"بركان", floods:"فيضان", earthquakes:"زلزال", drought:"جفاف", dustHaze:"غبار", landslides:"انهيار أرضي", seaLakeIce:"جليد", snow:"ثلوج", tempExtremes:"حرارة قصوى", waterColor:"مائي" };
+function loadEvents(){
+  fetch("https://eonet.gsfc.nasa.gov/api/v3/events?status=open&days=60&limit=350")
+  .then(function(r){ return r.json(); }).then(function(j){
+    var feats = [];
+    (j.events || []).forEach(function(ev){
+      var g = ev.geometry && ev.geometry[ev.geometry.length - 1];
+      if (!g || !g.coordinates) return;
+      var coords = g.type === "Polygon" ? g.coordinates[0][0] : g.coordinates;
+      var cat = (ev.categories && ev.categories[0] && ev.categories[0].id) || "";
+      feats.push({ type:"Feature",
+        geometry:{ type:"Point", coordinates: coords },
+        properties:{ kind:"event", title: ev.title, cat: EONET_LABELS[cat] || cat,
+          date: g.date, link: ev.sources && ev.sources[0] ? ev.sources[0].url : "" } });
+    });
+    if (map && map.getSource("events-src")) map.getSource("events-src").setData({ type:"FeatureCollection", features: feats });
+    setCount("events", feats.length);
+    $("st-events").textContent = fmt(feats.length);
+    feedEvents = feats; renderFeed();
+  }).catch(function(){});
+}
+
+/* ---------- ISS ---------- */
+var issMarker = null, issTrail = [];
+function startISS(){
+  if (!map) return;
+  var el = document.createElement("div");
+  el.className = "iss-marker";
+  el.innerHTML = '<svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><rect x="9" y="9" width="6" height="6" rx="1"/><path d="M2 10l7 2M2 15l7-1M22 10l-7 2M22 15l-7-1M12 2v7M12 15v7"/></svg>';
+  el.title = "محطة الفضاء الدولية";
+  issMarker = new maplibregl.Marker({ element: el }).setLngLat([0, 0]).addTo(map);
+  el.addEventListener("click", function(){
+    fetchISS(true);
+  });
+  fetchISS(false);
+  setInterval(function(){ fetchISS(false); }, 5000);
+}
+function fetchISS(showCard){
+  if (!map) return;
+  fetch("https://api.wheretheiss.at/v1/satellites/25544")
+  .then(function(r){ return r.json(); }).then(function(j){
+    var ll = [j.longitude, j.latitude];
+    if (issMarker) issMarker.setLngLat(ll);
+    $("st-iss").textContent = fmt(Math.round(j.altitude)) + " km";
+    issTrail.push(ll); if (issTrail.length > 90) issTrail.shift();
+    if (!map.getSource("iss-trail")){
+      map.addSource("iss-trail", { type:"geojson", data:{ type:"Feature", geometry:{ type:"LineString", coordinates: issTrail } } });
+      map.addLayer({ id:"iss-trail", type:"line", source:"iss-trail",
+        paint:{ "line-color":"#3ec6b8", "line-width":1.6, "line-opacity":0.55, "line-dasharray":[2,2] } });
+    } else {
+      map.getSource("iss-trail").setData({ type:"Feature", geometry:{ type:"LineString", coordinates: issTrail } });
+    }
+    if (showCard){
+      openDetail("محطة فضائية", "محطة الفضاء الدولية ISS", [
+        ["الارتفاع", fmt(Math.round(j.altitude)) + " km"],
+        ["السرعة", fmt(Math.round(j.velocity)) + " km/h"],
+        ["خط العرض", j.latitude.toFixed(2) + "°"],
+        ["خط الطول", j.longitude.toFixed(2) + "°"],
+        ["الرؤية", j.visibility === "eclipsed" ? "في ظل الأرض" : "مضاءة بالشمس", true]
+      ], null);
+      map.flyTo({ center: ll, zoom: Math.max(map.getZoom(), 3) });
+    }
+  }).catch(function(){});
+}
+
+/* ---------- Detail card ---------- */
+function openDetail(kind, title, rows, link){
+  /* Any new card stops a running camera stream / flight track first;
+     the camera and flight openers re-arm theirs right after this returns. */
+  stopCam(); stopTrack();
+  $("d-media").hidden = true;
+  var act0 = $("d-act"); act0.className = "d-act"; act0.onclick = null;
+  $("d-kind").textContent = kind;
+  $("d-title").textContent = title;
+  var body = $("d-body");
+  body.innerHTML = rows.map(function(r){
+    return '<div class="d-row"><span>' + esc(r[0]) + '</span><b class="' + (r[2] ? "ar" : "") + '">' + esc(r[1]) + '</b></div>';
+  }).join("");
+  var a = $("d-link");
+  if (link){ a.href = link; a.style.display = "flex"; } else { a.style.display = "none"; }
+  $("detail").classList.add("open");
+}
+$("d-close").addEventListener("click", function(){ stopCam(); stopTrack(); $("detail").classList.remove("open"); });
+
+function openQuakeDetail(p){
+  openDetail("زلزال — USGS", p.title, [
+    ["القوة", (Number(p.mag) || 0).toFixed(1) + " درجات"],
+    ["العمق", fmt(Math.round(Number(p.depth) || 0)) + " km"],
+    ["الوقت (بغداد)", new Date(p.time).toLocaleString("ar-IQ", { timeZone:"Asia/Baghdad" }), true],
+    ["تحذير تسونامي", p.tsunami ? "نعم" : "لا", true]
+  ], p.url || null);
+}
+function openEventDetail(p){
+  openDetail("حدث طبيعي — NASA", p.title, [
+    ["النوع", p.cat || "—", true],
+    ["آخر تحديث", new Date(p.date).toLocaleDateString("ar-IQ"), true]
+  ], p.link || null);
+}
+
+/* ---------- «يحدث الآن في العالم» — live feed of the newest events on Earth ----------
+   Fed by the same live USGS + NASA EONET loads as the map layers, so every new
+   earthquake, fire, storm or eruption appears here the moment its source reports it. */
+var feedQuakes = [], feedEvents = [];
+function timeAgo(ts){
+  var s = Math.max(0, (Date.now() - ts) / 1000);
+  if (s < 90) return "قبل لحظات";
+  var m = Math.round(s / 60);
+  if (m < 60) return "قبل " + m + " دقيقة";
+  var h = Math.round(m / 60);
+  if (h < 24) return "قبل " + h + " ساعة";
+  return "قبل " + Math.round(h / 24) + " يوم";
+}
+function feedItemsAll(){
+  var items = [];
+  feedQuakes.forEach(function(f){
+    items.push({ ts: f.properties.time, kind: "quake", title: f.properties.title,
+      meta: "زلزال بقوة " + (Number(f.properties.mag) || 0).toFixed(1),
+      coords: f.geometry.coordinates, p: f.properties });
+  });
+  feedEvents.forEach(function(f){
+    items.push({ ts: new Date(f.properties.date).getTime(), kind: "event", title: f.properties.title,
+      meta: f.properties.cat || "حدث طبيعي",
+      coords: f.geometry.coordinates, p: f.properties });
+  });
+  items.sort(function(a, b){ return b.ts - a.ts; });
+  return items;
+}
+var tickerTimer = null, tickerIdx = 0;
+function renderTicker(items){
+  var el = $("ticker-text"), tm = $("ticker-time");
+  if (!el || !items.length) return;
+  var top = items.slice(0, 10);
+  var show = function(){
+    var it = top[tickerIdx % top.length]; tickerIdx++;
+    el.style.opacity = "0";
+    setTimeout(function(){
+      el.textContent = (it.kind === "quake" ? "زلزال — " : "حدث طبيعي — ") + it.title + " · " + it.meta;
+      if (tm) tm.textContent = timeAgo(it.ts);
+      el.style.opacity = "1";
+    }, 250);
+  };
+  show();
+  if (tickerTimer) clearInterval(tickerTimer);
+  tickerTimer = setInterval(show, 6000);
+}
+function renderFeed(){
+  var items = feedItemsAll();
+  renderTicker(items);
+  var wrap = $("feed");
+  if (!wrap) return;
+  if (!items.length){
+    wrap.innerHTML = '<p class="feed-empty">جارٍ جلب آخر الأحداث الحية…</p>';
+    return;
+  }
+  wrap.innerHTML = "";
+  items.slice(0, 14).forEach(function(it){
+    var b = document.createElement("button");
+    b.type = "button"; b.className = "feed-item";
+    var isNew = (Date.now() - it.ts) < 3600000;
+    b.innerHTML = '<span class="f-ico" aria-hidden="true">' +
+        svgIcon(it.kind === "quake" ? "quake" : "flame", it.kind === "quake" ? "#ff7a6b" : "#e2a63d", 18) + '</span>' +
+      '<span class="f-tx"><b>' + esc(it.title) + (isNew ? '<span class="new-tag">جديد</span>' : '') + '</b>' +
+      '<small>' + esc(it.meta) + ' · ' + timeAgo(it.ts) + '</small></span>';
+    b.addEventListener("click", function(){
+      if (map) map.flyTo({ center: [it.coords[0], it.coords[1]], zoom: Math.max(map.getZoom(), 5), duration: 1200 });
+      if (it.kind === "quake") openQuakeDetail(it.p); else openEventDetail(it.p);
+      if (window.innerWidth <= 900) panel.classList.remove("open");
+    });
+    wrap.appendChild(b);
+  });
+}
+
+var clicksBound = false;
+function bindClicks(){
+  if (clicksBound) return;
+  clicksBound = true;
+  var clickLayers = ["flights-c","quakes-c","events-c","cameras-c","wcams-c","vessels-c","straits-c","buildings-f","conflict-c","infra-c","people-c"];
+  clickLayers.forEach(function(lid){
+    map.on("mouseenter", lid, function(){ map.getCanvas().style.cursor = "pointer"; });
+    map.on("mouseleave", lid, function(){ map.getCanvas().style.cursor = ""; });
+  });
+  map.on("click", function(e){
+    var feats = map.queryRenderedFeatures(e.point, { layers: clickLayers.filter(function(l){ return map.getLayer(l); }) });
+    if (!feats.length){
+      /* What's here — real reverse geocode, weather and country data */
+      whatsHere(e);
+      return;
+    }
+    var p = feats[0].properties;
+    var fcoords = (feats[0].geometry && feats[0].geometry.coordinates) || [];
+    if (p.kind === "flight"){
+      /* Tap a plane → its card becomes a LIVE tracker (updates every 15s,
+         draws its real trail on the map) */
+      openFlight(p, fcoords[0], fcoords[1]);
+    }
+    else if (p.kind === "quake"){
+      openQuakeDetail(p);
+    }
+    else if (p.kind === "event"){
+      openEventDetail(p);
+    }
+    else if (p.kind === "camera"){
+      /* Tap a camera → the live feed opens inside the card and you watch it */
+      p._lon = fcoords[0]; p._lat = fcoords[1];
+      openCamera(p);
+    }
+    else if (p.kind === "wcam"){
+      /* Tap a world camera → its live video plays inside the card */
+      p._lon = fcoords[0]; p._lat = fcoords[1];
+      openWorldCam(p);
+    }
+    else if (p.kind === "vessel"){
+      var vrows = [
+        ["رقم MMSI", p.mmsi || "—"],
+        ["النوع", p.vtype || "سفينة", true],
+        ["السرعة", p.sog != null && p.sog !== "" ? Number(p.sog).toFixed(1) + " kt" : "—"],
+        ["المسار", p.cog != null && p.cog !== "" ? Math.round(Number(p.cog)) + "°" : "—"],
+        ["الوجهة", p.dest || "—", true]
+      ];
+      if (p.callsign) vrows.push(["نداء السفينة", p.callsign]);
+      if (p.draught != null && p.draught !== "" && Number(p.draught) > 0) vrows.push(["الغاطس", Number(p.draught).toFixed(1) + " m"]);
+      openDetail("سفينة — AIS حي", p.title, vrows, null);
+    }
+    else if (p.kind === "building"){
+      var brows = [ ["المصدر", "OpenStreetMap — بيانات حقيقية مرسومة من المتطوعين", true] ];
+      if (p.btype) brows.push(["نوع المبنى", p.btype]);
+      if (p.levels) brows.push(["عدد الطوابق", p.levels]);
+      if (p.street || p.hnum) brows.push(["العنوان", ((p.street || "") + " " + (p.hnum || "")).trim(), true]);
+      if (p.city) brows.push(["المدينة", p.city, true]);
+      openDetail("مبنى — مستوى البيوت", p.title, brows, null);
+    }
+    else if (p.kind === "strait"){
+      openDetail("مضيق حيوي", p.title, [
+        ["الأهمية", p.note, true],
+        ["بيانات العبور", "فعّل طبقة السفن بمفتاح AISHub المجاني لترى السفن العابرة هنا الآن", true]
+      ], null);
+    }
+    else if (p.kind === "theater"){
+      openDetail("نزاع — مسرح مراقبة", p.title, [
+        ["الوصف", p.note, true],
+        ["في النسخة الكاملة", "خطوط تماس وأحداث موثقة بفيديو وتشويش GPS حي", true]
+      ], null);
+    }
+    else if (p.kind === "infra"){
+      openDetail("بنية تحتية", p.title, [
+        ["النوع", p.infraKind, true],
+        ["في المنصة الأصلية", "47,927 مطاراً و1,078 ميناء و34,936 محطة طاقة و5,356 سداً", true]
+      ], null);
+    }
+    else if (p.kind === "person"){
+      openDetail("أشخاص وشركات", p.title, [
+        ["الملاحظة", p.note, true],
+        ["في المنصة الأصلية", "1,594 شخصية و4,123 شركة بمقارها حول العالم", true]
+      ], null);
+    }
+  });
+}
+
+/* ---------- Base style switching ---------- */
+var currentStyle = "dark";
+function setBaseStyle(s){
+  if (!map){ toast("الخريطة غير محملة بعد"); return; }
+  document.querySelectorAll(".style-row button").forEach(function(x){
+    x.classList.toggle("active", x.getAttribute("data-style") === s);
+  });
+  if (s === "sat"){
+    if (currentStyle !== "sat"){
+      map.setStyle(STYLES.dark);
+      map.once("style.load", function(){
+        initLayers();
+        if (map.getLayer(SAT_ID)) map.setLayoutProperty(SAT_ID, "visibility", "visible");
+        currentStyle = "sat";
+      });
+    }
+  } else {
+    currentStyle = s;
+    map.setStyle(STYLES[s]);
+    map.once("style.load", function(){ initLayers(); });
+  }
+}
+document.querySelectorAll(".style-row button").forEach(function(b){
+  b.addEventListener("click", function(){ setBaseStyle(b.getAttribute("data-style")); });
+});
+
+/* ---------- Globe / world / 3D / locate / refresh ---------- */
+$("btn-globe").addEventListener("click", function(){
+  if (!map){ toast("الخريطة غير محملة بعد"); return; }
+  globeOn = !globeOn;
+  this.classList.toggle("active", globeOn);
+  applyGlobe();
+  if (globeOn){
+    map.easeTo({ pitch: 0, duration: 600 });
+    toast("عرض الكرة الأرضية الكاملة — مثل الموقع المرجعي");
+  } else {
+    toast("العرض المسطح — مركاتور");
+  }
+  if (layerOn("flights")) loadFlights();
+});
+$("btn-world").addEventListener("click", function(){
+  if (!map){ toast("الخريطة غير محملة بعد"); return; }
+  if (!globeOn){ globeOn = true; $("btn-globe").classList.add("active"); applyGlobe(); }
+  map.flyTo({ center: [38, 25], zoom: 1.55, pitch: 0, duration: 1400 });
+});
+/* House-level zoom: satellite + real building footprints at zoom 18 */
+$("btn-houses").addEventListener("click", function(){
+  if (!map){ toast("الخريطة غير محملة بعد"); return; }
+  if (globeOn){ globeOn = false; $("btn-globe").classList.remove("active"); applyGlobe(); }
+  if (!layerOn("buildings")) setLayerOn("buildings", true);
+  setBaseStyle("sat");
+  map.flyTo({ center: map.getCenter(), zoom: 18, pitch: 0, duration: 1700 });
+  toast("زوم البيوت — صور القمر الصناعي وحدود المباني الحقيقية حتى مستوى البيت");
+});
+var tilted = false;
+$("btn-3d").addEventListener("click", function(){
+  if (!map){ toast("الخريطة غير محملة بعد"); return; }
+  if (globeOn){ toast("الإمالة الثلاثية تعمل في العرض المسطح — أوقف الكرة الأرضية أولاً"); return; }
+  tilted = !tilted;
+  this.classList.toggle("active", tilted);
+  map.easeTo({ pitch: tilted ? 55 : 0, duration: 800 });
+});
+$("btn-locate").addEventListener("click", function(){
+  if (!navigator.geolocation){ toast("المتصفح لا يدعم تحديد الموقع"); return; }
+  navigator.geolocation.getCurrentPosition(function(pos){
+    if (map) map.flyTo({ center:[pos.coords.longitude, pos.coords.latitude], zoom: 9 });
+    toast("تم الانتقال إلى موقعك");
+  }, function(){ toast("تعذر الوصول إلى موقعك"); });
+});
+$("btn-refresh").addEventListener("click", function(){
+  loadFlights(); loadShips(); loadBuildings(); loadQuakes(); loadEvents(); loadCameras();
+  toast("جارٍ تحديث كل الطبقات الحية");
+});
+/* Videowall: every verified world live camera playing at once */
+$("btn-videowall").addEventListener("click", function(){
+  var tiles = WORLD_CAMS.map(function(c){
+    return '<div class="vw-tile"><div class="vw-frame"><iframe data-src="' + esc(c.embed) + '" allow="autoplay; encrypted-media; picture-in-picture" allowfullscreen loading="lazy" title="' + esc(c.title) + '"></iframe></div>' +
+      '<div class="vw-cap"><b>' + esc(c.title) + '</b><span>' + esc(c.city) + ' — ' + esc(c.source) + '</span></div></div>';
+  }).join("");
+  openModal(
+    '<h2 id="modal-title">جدار البث المباشر — كاميرات العالم الحية</h2>' +
+    '<p class="sub">٣٠ كاميرا عالمية تبث فيديو حياً الآن من يوتيوب لايف — مكة والمدينة ونيويورك ولندن وطوكيو وباريس والقدس وغيرها. كل بثوثها موثقة حية بتاريخ 22 تشرين الثاني 2026. دوس أي علامة كاميرا على الخريطة لفتح بثها كبيراً داخل بطاقتها.</p>' +
+    '<div class="vw-grid">' + tiles + '</div>' +
+    '<p class="fineprint">البثوث الحية على يوتيوب قد تتوقف مؤقتاً عند القناة نفسها ثم تعود — لمكة والمدينة يُستخدم تضمين القناة الرسمية فيتحول تلقائياً للبث الحي الحالي. لا توجد كاميرا ويب عامة حية موثقة في بغداد أو العراق حالياً، وكاميرات دبي كانت مطفأة لحظة التحقق، لذلك لا تظهر هنا إلا كاميرات حية حقيقية.</p>'
+  );
+  modalContent.querySelectorAll("iframe[data-src]").forEach(function(f){ f.src = f.getAttribute("data-src"); });
+});
+
+/* One tap to where hundreds of official live cameras actually are */
+$("btn-cams-la").addEventListener("click", function(){
+  if (!map){ toast("الخريطة غير محملة بعد"); return; }
+  if (globeOn){ globeOn = false; $("btn-globe").classList.remove("active"); applyGlobe(); }
+  if (!layerOn("cameras")) setLayerOn("cameras", true);
+  map.flyTo({ center: [-118.32, 34.03], zoom: 10, duration: 1600 });
+  toast("لوس أنجلوس — انقر أي علامة كاميرا على الخريطة لتشاهد بثها الحي");
+});
+
+/* ---------- Panel toggle (mobile) ---------- */
+var panel = $("panel"), pToggle = $("panel-toggle");
+pToggle.addEventListener("click", function(){
+  var open = panel.classList.toggle("open");
+  pToggle.setAttribute("aria-expanded", open ? "true" : "false");
+});
+if (map) map.on("click", function(){ if (window.innerWidth <= 900) panel.classList.remove("open"); });
+
+/* ---------- Search (Nominatim) ---------- */
+var searchInput = $("search"), searchRes = $("search-results"), searchTimer = null;
+searchInput.addEventListener("input", function(){
+  clearTimeout(searchTimer);
+  var q = searchInput.value.trim();
+  if (q.length < 3){ searchRes.classList.remove("open"); return; }
+  searchTimer = setTimeout(function(){
+    fetch("https://nominatim.openstreetmap.org/search?format=json&limit=6&accept-language=ar&q=" + encodeURIComponent(q))
+    .then(function(r){ return r.json(); }).then(function(list){
+      if (!list.length){ searchRes.classList.remove("open"); return; }
+      searchRes.innerHTML = "";
+      list.forEach(function(item){
+        var b = document.createElement("button");
+        b.type = "button";
+        var parts = (item.display_name || "").split(",");
+        b.innerHTML = esc(parts[0]) + "<small>" + esc(parts.slice(1, 4).join("،")) + "</small>";
+        b.addEventListener("click", function(){
+          searchRes.classList.remove("open");
+          searchInput.value = parts[0];
+          if (map) map.flyTo({ center:[parseFloat(item.lon), parseFloat(item.lat)], zoom: 10 });
+        });
+        searchRes.appendChild(b);
+      });
+      searchRes.classList.add("open");
+    }).catch(function(){});
+  }, 450);
+});
+document.addEventListener("click", function(e){
+  if (!e.target.closest(".searchbox")) searchRes.classList.remove("open");
+});
+
+/* ---------- Modal: plans & about ---------- */
+var modalBack = $("modal-back"), modalContent = $("modal-content");
+function openModal(html){ modalContent.innerHTML = html; modalBack.classList.add("open"); }
+function closeModal(){ modalBack.classList.remove("open"); modalContent.innerHTML = ""; /* unloads any playing videowall streams */ }
+$("modal-close").addEventListener("click", closeModal);
+modalBack.addEventListener("click", function(e){ if (e.target === modalBack) closeModal(); });
+document.addEventListener("keydown", function(e){ if (e.key === "Escape"){ closeModal(); stopCam(); stopTrack(); $("detail").classList.remove("open"); } });
+
+$("btn-plans").addEventListener("click", function(){
+  openModal(
+    '<h2 id="modal-title">خطط الاشتراك — مخطط النسخة العربية</h2>' +
+    '<p class="sub">نفس منطق تسعير المنصة الأصلية Argos Atlas: حساب مجاني بكل الطبقات وحصة كاميرات يومية مع إعلانات، وخطط PRO تفتح كل شيء بلا حدود. الأسعار أدناه هي أسعار المنصة الأصلية كما وثّقها تقرير الاستكشاف في 22 تشرين الثاني 2026.</p>' +
+    '<div class="plans">' +
+      '<div class="plan"><h4>مجاني</h4><div class="price">$0</div><ul><li>كل الطبقات الثماني</li><li>كاميرات بحصة يومية</li><li>إعلانات</li><li>دخول بحساب گوگل أو رابط بريد</li></ul></div>' +
+      '<div class="plan hot"><h4>OUTPOST</h4><div class="price">$23.99<small> / شهر</small></div><ul><li>كاميرات بلا حدود وبلا إعلانات</li><li>تسجيل كاميرات وأرشيف ٢٤ ساعة</li><li>تنبيهات و Geofences</li><li>تصدير CSV و GeoJSON و KML</li></ul></div>' +
+      '<div class="plan"><h4>DISTRICT</h4><div class="price">$62.99<small> / شهر</small></div><ul><li>كل مزايا OUTPOST</li><li>١٥ كاميرا مسجلة (٣ فيديو حي)</li><li>10,000 رصيد ذكاء اصطناعي شهرياً</li><li>سجل ٩٠ يوماً وكرة ثلاثية الأبعاد</li></ul></div>' +
+      '<div class="plan"><h4>DIVISION</h4><div class="price">$219<small> / شهر</small></div><ul><li>كل مزايا DISTRICT</li><li>١٥٠ كاميرا مسجلة (٨ فيديو حي)</li><li>100,000 رصيد ذكاء اصطناعي شهرياً</li><li>٥٠ منطقة تنبيه جغرافي</li></ul></div>' +
+      '<div class="plan"><h4>AGENCY</h4><div class="price">$4,999<small> / شهر</small></div><ul><li>واجهة برمجة API كاملة</li><li>ربط MCP للأدوات الذكية</li><li>دعم مؤسسي</li></ul></div>' +
+    '</div>' +
+    '<p class="fineprint">الخطط السنوية في المنصة الأصلية أرخص بكثير (OUTPOST يعادل 4.17 دولار بالشهر سنوياً)، وخطة العشر سنوات: OUTPOST بـ 149.99 دولار و DISTRICT بـ 449.99 دولار. الدفع عبر Stripe مع إلغاء بأي وقت واسترداد خلال ٧ أيام. في المنصة الأصلية الدفع فعلي عبر Stripe — وهنا تُعرض الخطط بنفس الأرقام بانتظار فتح بوابة الدفع مع إطلاق الحسابات.</p>'
+  );
+});
+$("btn-about").addEventListener("click", function(){
+  openModal(
+    '<h2 id="modal-title">كيف يعمل أطلس أرغوس؟</h2>' +
+    '<p class="sub">السر بسيط: المنصة لا تملك أي مصدر بيانات. تجمع بيانات مفتوحة مجانية من جهات رسمية — إشارات طائرات ADS-B وسفن AIS وكاميرات بوابات المرور الحكومية وبيانات USGS و NASA — وتعرضها كلها على خريطة واحدة سريعة ببلاطات متجهة.</p>' +
+    '<div class="road">' +
+      '<div class="step"><b>المرحلة ١ — النواة (تعمل الآن)</b><p>خريطة عربية كاملة الاتجاه RTL ببلاطات CARTO الداكنة عبر MapLibre، مع طائرات ADS-B حية بمرشحات مدني وعسكري وطوارئ، وزلازل وأحداث حية، وكرة أرضية كاملة، وبطاقات تفاصيل وبحث جغرافي.</p></div>' +
+      '<div class="step"><b>المرحلة ٢ — التكبير حتى البيوت والسفن (تعمل الآن)</b><p>تقريب حتى زوم ١٩ بصور قمر صناعي Esri وحدود مبانٍ وبيوت حقيقية من OpenStreetMap عبر Overpass مع عنوان كل مبنى، وسفن AIS حية من AISHub بمفتاح مجاني، و٣٠ كاميرا عالمية بفيديو حي متواصل عبر YouTube Live موثقة وحدة وحدة (مكة والمدينة ونيويورك ولندن وطوكيو وباريس وغيرها) تفتح بثها داخل البطاقة عند النقر مع جدار بث يعرضها كلها مرة واحدة، وكاميرات حية من بوابات النقل الرسمية Caltrans و WSDOT، وشريط «يحدث الآن في العالم» يجلب أحدث الزلازل والأحداث الطبيعية من USGS و NASA لحظة بلحظة، وتتبع حي لأي طائرة تنقرها، وطقس أي نقطة من Open-Meteo وبيانات دول من البنك الدولي داخل بطاقة «ما هذا المكان؟».</p></div>' +
+      '<div class="step"><b>المرحلة ٣ — الحسابات والربح</b><p>حساب مجاني بحصة يومية وإعلانات، وخطط PRO، وتنبيهات و Geofences، وتسجيل كاميرات، وتصدير البيانات، ووضع المحلل وجدار فيديو من ١٦ كاميرا.</p></div>' +
+    '</div>' +
+    '<p class="fineprint">أرقام المنصة الأصلية لحظة الفحص (22 تشرين الثاني 2026): 228,161 كاميرا في أكثر من 190 دولة، 10,067 رحلة جوية، 19,683 سفينة، 1,669 حدث حرب موثقاً عبر 16 جبهة، 34,936 محطة طاقة، 47,927 مطاراً، 226 منطقة خطر، و56 منطقة تشويش GPS تُكتشف يومياً. ملاحظة واقعية: الـ 200 ألف كاميرا جُمعت يدوياً عبر سنين — النسخة الأولى تبدأ بكاميرات أقل وطبقات حية كاملة، وهذا كافٍ للإطلاق. المصدر: argosatlas.com</p>'
+  );
+});
+
+/* ---------- Boot ---------- */
+buildPanel();
+if (map){
+  map.on("load", function(){
+    initLayers();
+    setInterval(function(){ if (layerOn("flights")) loadFlights(); }, 60000);
+    setInterval(loadQuakes, 300000);
+    setInterval(loadEvents, 600000);
+    setInterval(renderFeed, 60000);   /* keep «قبل كم دقيقة» honest in the live feed */
+  });
+  map.on("error", function(){ /* keep UI alive if a tile source hiccups */ });
+} else {
+  /* Stats that do not need the map still go live */
+  loadQuakes(); loadEvents();
+}
+
+})();
+</script>
+</body>
+</html>
